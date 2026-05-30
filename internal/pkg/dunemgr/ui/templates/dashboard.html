@@ -10,8 +10,10 @@
 </nav>
 <h1 id="dashboard-top">{{.Host}}</h1>
 <article>
-  <p>BG state: <strong id="bg-state">{{.Snap.BGState}}</strong>
-     <small id="tunnel-badge"></small></p>
+  <p>BG state: <strong id="bg-state">{{if .Snap.BGState}}{{.Snap.BGState}}{{else}}probing…{{end}}</strong>
+     <small id="health-badge" class="muted"></small>
+     <small id="poller-live" class="muted"></small></p>
+  <p id="bg-error" class="muted" role="alert"{{if not .Snap.Error}} hidden{{end}}>{{.Snap.Error}}</p>
   <p>Pods ready: <span id="pod-count">{{.Snap.PodReady}}/{{.Snap.PodTotal}}</span></p>
 </article>
 
@@ -28,6 +30,7 @@
       <a role="button"
          hx-get="/host/{{.Host}}/backups?bg={{.BG}}"
          hx-target="#tab-body"
+         hx-indicator="#tab-spinner"
          hx-swap="innerHTML">Backups</a>
     </li>
     <li>
@@ -40,6 +43,7 @@
       <a role="button"
          hx-get="/host/{{.Host}}/db"
          hx-target="#tab-body"
+         hx-indicator="#tab-spinner"
          hx-swap="innerHTML">DB</a>
     </li>
     <li>
@@ -51,6 +55,7 @@
   </ul>
 </nav>
 
+<span id="tab-spinner" class="htmx-indicator" aria-live="polite">loading…</span>
 <div id="tab-body" hx-get="/host/{{.Host}}/lifecycle/_partial" hx-trigger="load" hx-swap="innerHTML">
   <p class="muted">loading…</p>
 </div>

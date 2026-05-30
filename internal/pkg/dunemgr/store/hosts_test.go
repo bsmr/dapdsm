@@ -3,6 +3,8 @@ package store
 import (
 	"path/filepath"
 	"testing"
+
+	"go.etcd.io/bbolt"
 )
 
 func TestHostPutGet(t *testing.T) {
@@ -10,10 +12,8 @@ func TestHostPutGet(t *testing.T) {
 	defer s.Close()
 
 	want := HostProfile{
-		Name:        "vm-a",
-		SSHAlias:    "vm-a",
-		FQDN:        "vm-a.example.org",
-		K3sCABase64: "QkFTRTY0Q0E=",
+		Name:     "vm-a",
+		SSHAlias: "vm-a",
 	}
 	if err := s.PutHost(want); err != nil {
 		t.Fatalf("PutHost: %v", err)
@@ -67,5 +67,21 @@ func TestDeleteHost(t *testing.T) {
 	_, err := s.GetHost("vm-a")
 	if err == nil {
 		t.Errorf("GetHost after Delete: want error, got nil")
+	}
+}
+
+func TestGetHostIgnoresLegacyFields(t *testing.T) {
+	s, _ := Open(filepath.Join(t.TempDir(), "state.bolt"))
+	defer s.Close()
+	// Simulate an old record with extra keys by storing raw JSON.
+	raw := `{"name":"vm-a","ssh_alias":"vm-a","fqdn":"x","k3s_ca_b64":"y"}`
+	if err := s.db.Update(func(tx *bbolt.Tx) error {
+		return tx.Bucket([]byte("hosts")).Put([]byte("vm-a"), []byte(raw))
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetHost("vm-a")
+	if err != nil || got.Name != "vm-a" || got.SSHAlias != "vm-a" {
+		t.Errorf("got=%+v err=%v, want vm-a/vm-a", got, err)
 	}
 }

@@ -151,3 +151,23 @@ func TestCmdRunner_Get_OmitsKubeconfigWhenUnset(t *testing.T) {
 		t.Errorf("argv %q must not contain --kubeconfig when unset", string(out))
 	}
 }
+
+// getterFake implements only kube.Getter.
+type getterFake struct{ out string }
+
+func (g getterFake) Get(_ context.Context, _ ...string) ([]byte, error) {
+	return []byte(g.out), nil
+}
+
+func TestFindBattleGroupNamespaceAcceptsGetter(t *testing.T) {
+	t.Parallel()
+	var _ Getter = getterFake{} // compile-time: getterFake satisfies Getter
+	ns, err := FindBattleGroupNamespace(context.Background(),
+		getterFake{out: "default\nfuncom-seabass-x\n"})
+	if err != nil {
+		t.Fatalf("FindBattleGroupNamespace: %v", err)
+	}
+	if ns != "funcom-seabass-x" {
+		t.Errorf("ns = %q, want funcom-seabass-x", ns)
+	}
+}

@@ -42,7 +42,10 @@ func TestDashboardHasTabNav(t *testing.T) {
 		`data-host="vm-a"`,
 		`id="bg-state"`,
 		`id="pod-count"`,
-		`id="tunnel-badge"`,
+		`id="health-badge"`,
+		`id="bg-error"`,
+		`id="tab-spinner"`,
+		`hx-indicator="#tab-spinner"`,
 		`id="last-action"`,
 		`aria-label="breadcrumb"`,
 	} {

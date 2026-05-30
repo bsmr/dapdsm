@@ -1,55 +1,60 @@
-// Package probe runs a one-shot status check against a host.
+// Package probe runs a one-shot status check against a host by reading
+// the BattleGroup CR's observed status via SSH→node-kubectl. The node's
+// own kubeconfig authenticates; dunemgr needs no tunnel or stored CA.
 package probe
 
 import (
 	"context"
-	"io"
-	"os"
-	"path/filepath"
 	"time"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/tunnel"
 	"go.muehmer.eu/dapdsm/internal/pkg/kube"
+	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
 
-// newKubeRunner builds the Runner used to talk to the tunneled API
-// server. Overridable in tests.
-var newKubeRunner = func(kubeconfigPath string, stderr io.Writer) kube.Runner {
-	return &kube.CmdRunner{Kubeconfig: kubeconfigPath, Stderr: stderr}
+// ProbeTimeout bounds a single probe so a slow or hung kubectl can never
+// wedge the poller.
+const ProbeTimeout = 15 * time.Second
+
+// sshGetter runs `kubectl get …` on the node over SSH.
+type sshGetter struct {
+	ssh  *ssh.Client
+	host string
 }
 
-// Probe opens the K8s API tunnel (idempotent), writes a throwaway
-// kubeconfig, reads the BattleGroup CR's observed status, writes the
-// snapshot to the store, and returns it. Transport/parse failures are
-// recorded on the snapshot (BGState UNKNOWN + Error) rather than
-// returned as a hard error, so the poller keeps running.
-func Probe(ctx context.Context, s *store.Store, tm *tunnel.Manager, host string) (store.StatusSnapshot, error) {
-	prof, err := s.GetHost(host)
+func (g sshGetter) Get(ctx context.Context, args ...string) ([]byte, error) {
+	res, err := g.ssh.Run(ctx, g.host, "kubectl", append([]string{"get"}, args...)...)
 	if err != nil {
+		return nil, err
+	}
+	return []byte(res.Stdout), nil
+}
+
+// newGetter builds the kube.Getter used to read the cluster. Overridable
+// in tests.
+var newGetter = func(sshc *ssh.Client, host string) kube.Getter {
+	return sshGetter{ssh: sshc, host: host}
+}
+
+// Probe reads the BattleGroup CR's observed status over SSH and writes a
+// snapshot to the store. Transport/parse failures are recorded on the
+// snapshot (BGState UNKNOWN + Error) rather than returned as a hard error,
+// so the poller keeps running. A hard error is returned only when the host
+// is not registered.
+func Probe(ctx context.Context, s *store.Store, sshc *ssh.Client, host string) (store.StatusSnapshot, error) {
+	if _, err := s.GetHost(host); err != nil {
 		return store.StatusSnapshot{}, err
 	}
 	now := time.Now().UTC()
 
-	fail := func(msg string) (store.StatusSnapshot, error) {
-		snap := store.StatusSnapshot{Host: host, ProbedAt: now, BGState: "UNKNOWN", Error: msg}
+	pctx, cancel := context.WithTimeout(ctx, ProbeTimeout)
+	defer cancel()
+
+	st, err := probeStatus(pctx, newGetter(sshc, host))
+	if err != nil {
+		snap := store.StatusSnapshot{Host: host, ProbedAt: now, BGState: "UNKNOWN", Error: err.Error()}
 		_ = s.PutStatus(snap)
 		return snap, nil
-	}
-
-	port, err := tm.OpenSlot(ctx, host, "127.0.0.1", 6443)
-	if err != nil {
-		return fail(err.Error())
-	}
-	kubeconfigPath := filepath.Join(tunnel.RuntimeDir(), "kubeconfig-"+host)
-	if err := kube.WriteKubeconfig(kubeconfigPath, port, prof.FQDN, prof.K3sCABase64); err != nil {
-		return fail(err.Error())
-	}
-
-	r := newKubeRunner(kubeconfigPath, os.Stderr)
-	st, err := probeStatus(ctx, r)
-	if err != nil {
-		return fail(err.Error())
 	}
 
 	snap := snapshotFromStatus(host, st, now)

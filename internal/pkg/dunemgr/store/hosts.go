@@ -9,12 +9,11 @@ import (
 )
 
 // HostProfile holds everything dunemgr needs to talk to one host.
-// Stored as JSON in the "hosts" bucket, keyed by Name.
+// Stored as JSON in the "hosts" bucket, keyed by Name. Extra keys on
+// older records (e.g. fqdn, k3s_ca_b64) are ignored on load.
 type HostProfile struct {
-	Name        string `json:"name"`                 // operator-chosen label
-	SSHAlias    string `json:"ssh_alias"`            // resolved by ~/.ssh/config
-	FQDN        string `json:"fqdn,omitempty"`       // for K3s tls-server-name
-	K3sCABase64 string `json:"k3s_ca_b64,omitempty"` // base64-encoded K3s CA
+	Name     string `json:"name"`      // operator-chosen label
+	SSHAlias string `json:"ssh_alias"` // resolved by ~/.ssh/config
 }
 
 // ErrNotFound is returned by Get* when the key is absent.

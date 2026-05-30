@@ -142,7 +142,7 @@ func New(opts Options) (*Server, error) {
 		Error    string
 	}
 
-	hostMgr := &hostpool.Manager{Store: opts.Store, SSH: sshClient}
+	hostMgr := &hostpool.Manager{Store: opts.Store}
 
 	hostAddForm := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_ = r.Render(w, "hostadd", hostAddView{})
@@ -391,7 +391,7 @@ func New(opts Options) (*Server, error) {
 		host := req.PathValue("name")
 		channel := req.PathValue("channel")
 		switch channel {
-		case "bg", "actions", "tunnel":
+		case "bg", "actions", "health":
 		default:
 			http.Error(w, "unknown channel", http.StatusNotFound)
 			return

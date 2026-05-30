@@ -12,7 +12,7 @@ import (
 )
 
 // dbCmd runs a DB query (exec|columns|slow) against the BattleGroup database
-// on the named host via SSH tunnel.
+// on the named host via SSH + kubectl exec into the database pod.
 func dbCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
 		fmt.Fprintln(stderr, "usage: dunemgr db <host> exec <sql>")

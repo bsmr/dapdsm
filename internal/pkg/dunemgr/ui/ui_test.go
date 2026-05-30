@@ -78,16 +78,29 @@ func TestRenderSidebar(t *testing.T) {
 	}
 }
 
+func TestLayoutThemeToggleIsDiscreet(t *testing.T) {
+	r := New()
+	data := struct{ Operator struct{ Name string } }{}
+	data.Operator.Name = "Alice"
+	var buf bytes.Buffer
+	if err := r.Render(&buf, "home", data); err != nil {
+		t.Fatalf("Render home: %v", err)
+	}
+	body := buf.String()
+	if !strings.Contains(body, `id="theme-toggle"`) || !strings.Contains(body, `aria-label="toggle dark mode"`) {
+		t.Errorf("theme toggle not discreet/labelled: %s", body)
+	}
+	if strings.Contains(body, "◐ theme") {
+		t.Error("old oversized theme button still present")
+	}
+}
+
 func TestRenderDashboard(t *testing.T) {
 	r := New()
 	data := struct {
-		Host string
-		BG   string
-		Snap struct {
-			BGState  string
-			PodReady int
-			PodTotal int
-		}
+		Host       string
+		BG         string
+		Snap       store.StatusSnapshot
 		LastAction *store.AuditEntry
 	}{Host: "vm-a", BG: "vm-a"}
 	data.Snap.BGState = "RUNNING"

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"go.etcd.io/bbolt"
 )
@@ -26,9 +27,9 @@ func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, fmt.Errorf("mkdir parent: %w", err)
 	}
-	db, err := bbolt.Open(path, 0o600, nil)
+	db, err := bbolt.Open(path, 0o600, &bbolt.Options{Timeout: 3 * time.Second})
 	if err != nil {
-		return nil, fmt.Errorf("bbolt open: %w", err)
+		return nil, fmt.Errorf("open state db %s: database locked (is dunemgr serve running?): %w", path, err)
 	}
 	if err := db.Update(func(tx *bbolt.Tx) error {
 		for _, name := range allBuckets {
