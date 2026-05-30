@@ -1,0 +1,24 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{block "title" .}}dunemgr{{end}}</title>
+<link rel="stylesheet" href="/static/pico.min.css">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js"></script>
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<button id="theme-toggle" class="outline" style="float:right">◐ theme</button>
+<div class="shell">
+  {{/* Sidebar nav: shown on authenticated pages (data != nil); suppressed on
+       login (nil data). html/template prevents {{block}} default from being
+       overridden via {{define}} in the same parse set, so we use {{if .}} on
+       the page data as the auth gate — login renders with nil, all other
+       pages render with a non-nil struct. */}}
+  {{if .}}<aside id="hostnav" hx-get="/hosts" hx-trigger="load" hx-swap="innerHTML"><p class="muted">loading…</p></aside>{{end}}
+  <main class="container">{{block "body" .}}{{end}}</main>
+</div>
+</body>
+</html>
+{{end}}

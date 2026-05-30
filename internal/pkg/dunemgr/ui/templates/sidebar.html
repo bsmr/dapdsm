@@ -1,0 +1,11 @@
+{{define "sidebar"}}
+<h2>Hosts</h2>
+<ul>
+  {{range .Hosts}}
+  <li><a href="/host/{{.Name}}">{{.Name}}</a> <small class="muted">{{.BGState}}</small></li>
+  {{else}}
+  <li class="muted">no hosts yet</li>
+  {{end}}
+</ul>
+<p><a href="/hosts/add">+ Add host</a></p>
+{{end}}

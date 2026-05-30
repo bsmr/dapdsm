@@ -1,0 +1,40 @@
+{{/* internal/pkg/dunemgr/ui/templates/db.html */}}
+{{define "db"}}
+<section aria-labelledby="db-h">
+  <h3 id="db-h">DB — {{.Host}}</h3>
+
+  <details>
+    <summary>Schema ({{len .Tables}} tables)</summary>
+    {{if .Tables}}
+      <ul>
+      {{range .Tables}}
+        <li><code>{{.Schema}}.{{.Name}}</code>
+          <a role="button" class="outline"
+             hx-get="/host/{{$.Host}}/db/columns?schema={{.Schema}}&table={{.Name}}"
+             hx-target="#db-extra" hx-swap="innerHTML">columns</a></li>
+      {{end}}
+      </ul>
+    {{else}}
+      <p><em>(no tables yet — fresh DB, or the schema has not been initialised)</em></p>
+    {{end}}
+  </details>
+
+  <p><a role="button" class="outline"
+        hx-get="/host/{{.Host}}/db/slow"
+        hx-target="#db-extra" hx-swap="innerHTML">slow queries</a></p>
+  <div id="db-extra"></div>
+
+  <form hx-post="/host/{{.Host}}/db/exec"
+        hx-target="#db-result"
+        hx-swap="innerHTML">
+    <label for="db-sql">SQL</label>
+    <textarea id="db-sql" name="sql" rows="6" required placeholder="SELECT * FROM dune.player LIMIT 5;"></textarea>
+    <fieldset role="group">
+      <button type="submit">run</button>
+      <button type="submit" name="explain" value="1" class="contrast">EXPLAIN ANALYZE</button>
+    </fieldset>
+  </form>
+
+  <pre id="db-result"></pre>
+</section>
+{{end}}

@@ -1,0 +1,17 @@
+/* dunemgr overrides */
+.muted { color: var(--pico-muted-color); }
+
+/* Two-column shell: host sidebar + main content. The nav column is `auto`,
+   so it collapses to zero width on pages that render no sidebar (login). */
+.shell {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--pico-spacing);
+  align-items: start;
+}
+#hostnav { width: 14rem; }
+#hostnav ul { list-style: none; padding-left: 0; }
+@media (max-width: 768px) {
+  .shell { grid-template-columns: 1fr; }
+  #hostnav { width: auto; }
+}
