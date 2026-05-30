@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Re-applies operator-chosen state to a freshly-bootstrapped BattleGroup.
+#
+# NOTE: `dunectl reconcile` is now the recommended modern alternative —
+# it reads the same desired state from /etc/dune/dunectl.env declaratively.
+# This shell script is kept for users who want the explicit per-step view
+# and for cases where a step needs unusual flags.
+#
+# Copy this file to /etc/dune/post-bootstrap.sh on each host and edit
+# the values to taste. Run it once after `setup.sh` has generated the
+# BattleGroup CR. Idempotent — re-running is safe and a no-op if
+# nothing has drifted.
+#
+#   sudo cp etc/dune/post-bootstrap.sh.example /etc/dune/post-bootstrap.sh
+#   sudo chmod 0755 /etc/dune/post-bootstrap.sh
+#   sudoedit /etc/dune/post-bootstrap.sh
+#
+# The server password is read from /etc/dune/server-password so it is
+# kept out of this file (which lives on disk in cleartext). Prepare it
+# once with:
+#
+#   printf 'YOUR-PASSWORD' | sudo tee /etc/dune/server-password >/dev/null
+#   sudo chmod 0600 /etc/dune/server-password
+#   sudo chown root:root /etc/dune/server-password
+
+set -euo pipefail
+
+# 1. Provision the per-app Postgres role and database the Funcom
+#    database-operator's util-pod assumes already exist. Mandatory on
+#    every fresh BattleGroup; idempotent thereafter.
+dunectl init-db
+
+# 2. CR patches: set HOST_DATACENTER_IP_ADDRESS to the public IPv4 and
+#    strip the memory-focused-scheduler references that Funcom's
+#    Hyper-V template ships with but which do not exist on fresh k3s.
+dunectl patch-battlegroup
+
+# 2b. (Optional) Shift the UDP base ports off Funcom's hardcoded
+#     7777/7888 default. Required when two BattleGroups share one
+#     public IP behind a vCD-style edge — without it both servers try
+#     to bind UDP 7777 on different VMs and the second one's traffic
+#     gets DNATed to the first VM. Pick disjoint ranges (Funcom-default
+#     is 34 ports each, e.g. 7877-7910 / 7988-8021 for the second VM).
+#dunectl patch-game-ports --game-base 7877 --igw-base 7988
+
+# 3. Maps always-on (besides Survival_1 + Overmap, which Funcom seeds
+#    as always-on by default). Comment / extend to taste.
+dunectl enable-set SH_Arrakeen SH_HarkoVillage DeepDesert_1
+
+# 4. Battlegroup-wide console variables. Auto-quoting handles the
+#    string values; see `dunectl ini-set --help`.
+dunectl ini-set Bgd.ServerDisplayName "My Server Name"
+
+# Read the password from /etc/dune/server-password (root:root, 0600).
+# --apply pushes UserEngine.ini / UserGame.ini into the filebrowser pod,
+# --restart cycles the BattleGroup so the new values take effect.
+SERVER_PASSWORD="$(sudo cat /etc/dune/server-password)"
+dunectl ini-set --apply --restart Bgd.ServerLoginPassword "${SERVER_PASSWORD}"
+
+echo "post-bootstrap: done"

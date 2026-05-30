@@ -1,0 +1,33 @@
+{{define "shutdown"}}
+<section aria-labelledby="shutdown-h">
+  <h3 id="shutdown-h">Shutdown countdown — {{.Host}}</h3>
+  {{if .Pending}}
+    <article>
+      <p>Pending <strong>{{.Rec.Action}}</strong> ({{.Rec.Kind}}) at
+         unix <code>{{.Rec.AtUnix}}</code>, scheduled by {{.Rec.Operator}}.</p>
+      <form hx-post="/host/{{.Host}}/shutdown/cancel"
+            hx-target="#tab-body" hx-swap="innerHTML">
+        <button type="submit" class="contrast">cancel countdown</button>
+      </form>
+    </article>
+  {{else}}
+    <form hx-post="/host/{{.Host}}/shutdown"
+          hx-target="#tab-body" hx-swap="innerHTML">
+      <label for="sd-action">Action</label>
+      <select id="sd-action" name="action">
+        <option value="stop">stop</option>
+        <option value="restart">restart</option>
+      </select>
+      <label for="sd-kind">Kind</label>
+      <select id="sd-kind" name="kind">
+        <option value="Restart">Restart</option>
+        <option value="Maintenance">Maintenance</option>
+        <option value="Update">Update</option>
+      </select>
+      <label for="sd-lead">Lead time (seconds)</label>
+      <input id="sd-lead" type="number" name="lead" value="600" min="1" required>
+      <button type="submit">start countdown</button>
+    </form>
+  {{end}}
+</section>
+{{end}}

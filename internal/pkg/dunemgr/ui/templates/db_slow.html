@@ -1,0 +1,18 @@
+{{/* internal/pkg/dunemgr/ui/templates/db_slow.html */}}
+{{define "db_slow"}}
+<section aria-labelledby="dbslow-h">
+  <h4 id="dbslow-h">Slow queries — {{.Host}}</h4>
+  {{if .Rows}}
+    <table>
+      <thead><tr><th>mean ms</th><th>calls</th><th>query</th></tr></thead>
+      <tbody>
+      {{range .Rows}}
+        <tr><td>{{printf "%.1f" .MeanMS}}</td><td>{{.Calls}}</td><td><code>{{.Query}}</code></td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  {{else}}
+    <p><em>(no slow queries — pg_stat_statements may not be installed)</em></p>
+  {{end}}
+</section>
+{{end}}

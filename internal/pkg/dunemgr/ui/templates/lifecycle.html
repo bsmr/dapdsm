@@ -1,0 +1,44 @@
+{{define "lifecycle"}}
+<section id="lifecycle-status" aria-labelledby="lifecycle-h">
+  <h3 id="lifecycle-h">Lifecycle — {{.Host}}</h3>
+  {{if .Waiting}}
+    <p class="muted">waiting for first probe…</p>
+  {{else}}
+    {{if .Error}}<p class="muted" role="alert">probe error: {{.Error}}</p>{{end}}
+    <p>
+      BG: <strong>{{.BGState}}</strong>
+      &nbsp; DB: <strong>{{.DBPhase}}</strong>
+      &nbsp; Director: <strong>{{.DirectorPhase}}</strong>
+      &nbsp; size {{.Size}}{{if .Uptime}} &nbsp; up {{.Uptime}}{{end}}
+    </p>
+    {{if .Servers}}
+    <table>
+      <thead><tr><th>MAP</th><th>PHASE</th><th>RDY</th><th>RST</th><th>GAME</th><th>IGW</th><th>LAST EXIT</th></tr></thead>
+      <tbody>
+      {{range .Servers}}
+        <tr>
+          <td>{{.Map}}</td><td>{{.Phase}}</td>
+          <td>{{if .Ready}}✓{{else}}✗{{end}}</td>
+          <td>{{.Restarts}}</td>
+          <td>{{if .GamePort}}{{.GamePort}}{{else}}-{{end}}</td>
+          <td>{{if .IgwPort}}{{.IgwPort}}{{else}}-{{end}}</td>
+          <td>{{if .ExitReason}}{{.ExitReason}}{{else}}-{{end}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="muted">no servers reported</p>
+    {{end}}
+  {{end}}
+  <form>
+    <fieldset role="group">
+      <button type="button" hx-post="/host/{{.Host}}/lifecycle/start"   hx-target="#lifecycle-result" hx-swap="innerHTML" class="contrast">start</button>
+      <button type="button" hx-post="/host/{{.Host}}/lifecycle/stop"    hx-target="#lifecycle-result" hx-swap="innerHTML">stop</button>
+      <button type="button" hx-post="/host/{{.Host}}/lifecycle/restart" hx-target="#lifecycle-result" hx-swap="innerHTML">restart</button>
+      <button type="button" hx-post="/host/{{.Host}}/lifecycle/update"  hx-target="#lifecycle-result" hx-swap="innerHTML">update</button>
+    </fieldset>
+  </form>
+  <output id="lifecycle-result"></output>
+</section>
+{{end}}
