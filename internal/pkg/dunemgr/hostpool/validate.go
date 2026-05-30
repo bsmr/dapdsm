@@ -1,5 +1,6 @@
-// Package hostpool registers and tracks operator-defined hosts.
-// Wraps store with side-effects (K3s CA fetch via SSH).
+// Package hostpool registers and tracks operator-defined hosts. It wraps
+// the store with input validation; hosts are reached over SSH, so no
+// cluster bootstrap (CA fetch) happens here.
 package hostpool
 
 import (

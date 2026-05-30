@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -194,29 +193,6 @@ func TestLoginHasNoSidebarNav(t *testing.T) {
 	}
 }
 
-const sampleKubeconfig = `apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data: TEFTRTY0Q0FEQVRB
-    server: https://vm-a.example.org:6443
-  name: default
-`
-
-// kubeconfigSSH is an ssh.Runner whose Run returns a canned kubeconfig
-// (success) or an error (failure), exercising hostpool.Register's
-// fetchK3sCA without a real host.
-type kubeconfigSSH struct {
-	out string
-	err error
-}
-
-func (k kubeconfigSSH) Run(_ context.Context, _ string, _ ...string) (ssh.Result, error) {
-	return ssh.Result{Stdout: k.out}, k.err
-}
-func (kubeconfigSSH) RunWithStdin(_ context.Context, _ []byte, _ string, _ ...string) (ssh.Result, error) {
-	return ssh.Result{}, nil
-}
-
 func newServerWithSSH(t *testing.T, runner ssh.Runner) (*Server, *store.Store) {
 	t.Helper()
 	s, err := store.Open(filepath.Join(t.TempDir(), "state.bolt"))
@@ -245,7 +221,7 @@ func authedReq(method, target string, body io.Reader) *http.Request {
 }
 
 func TestHostAddFormRenders(t *testing.T) {
-	srv, _ := newServerWithSSH(t, kubeconfigSSH{})
+	srv := newTestServer(t)
 	w := httptest.NewRecorder()
 	srv.Handler.ServeHTTP(w, authedReq("GET", "/hosts/add", nil))
 	body := w.Body.String()
@@ -255,7 +231,7 @@ func TestHostAddFormRenders(t *testing.T) {
 }
 
 func TestHostAddSuccessRedirects(t *testing.T) {
-	srv, s := newServerWithSSH(t, kubeconfigSSH{out: sampleKubeconfig})
+	srv, s := newServerWithSSH(t, &recordingSSHRunner{})
 	form := strings.NewReader("name=vm-x&ssh_alias=vm-x")
 	w := httptest.NewRecorder()
 	req := authedReq("POST", "/hosts/add", form)
@@ -274,22 +250,22 @@ func TestHostAddSuccessRedirects(t *testing.T) {
 }
 
 func TestHostAddFailureRerendersForm(t *testing.T) {
-	srv, _ := newServerWithSSH(t, kubeconfigSSH{err: errors.New("dial tcp: timeout")})
-	form := strings.NewReader("name=vm-y&ssh_alias=vm-y")
+	srv := newTestServer(t)
+	form := strings.NewReader("name=-bad&ssh_alias=-bad")
 	w := httptest.NewRecorder()
 	req := authedReq("POST", "/hosts/add", form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	srv.Handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (re-render)", w.Code)
+		t.Fatalf("status = %d, want 200 (re-render); body=%s", w.Code, w.Body.String())
 	}
 	body := w.Body.String()
-	if !strings.Contains(body, "vm-y") {
+	if !strings.Contains(body, "-bad") {
 		t.Errorf("failed add did not preserve the submitted name; body=%s", body)
 	}
-	if !strings.Contains(body, "fetch K3s CA") {
-		t.Errorf("failed add did not surface the error; body=%s", body)
+	if !strings.Contains(body, "invalid") {
+		t.Errorf("failed add did not surface the validation error; body=%s", body)
 	}
 }
 

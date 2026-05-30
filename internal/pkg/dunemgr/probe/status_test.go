@@ -2,7 +2,6 @@ package probe
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -10,31 +9,23 @@ import (
 	"go.muehmer.eu/dapdsm/internal/pkg/battlegroup"
 )
 
-// kubeFake implements kube.Runner. Get switches on the resource arg:
-// "ns" returns the namespace list, "battlegroup" returns the CR JSON.
+// kubeFake implements kube.Getter. Get switches on the resource arg:
+// "ns" returns the namespace list; any other resource returns the CR JSON.
+// If err is set, Get always returns that error.
 type kubeFake struct {
 	nsOut string
 	crOut string
-	nsErr error
-	crErr error
+	err   error
 }
 
-func (k *kubeFake) Get(_ context.Context, args ...string) ([]byte, error) {
+func (f *kubeFake) Get(_ context.Context, args ...string) ([]byte, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
 	if len(args) > 0 && args[0] == "ns" {
-		return []byte(k.nsOut), k.nsErr
+		return []byte(f.nsOut), nil
 	}
-	if len(args) > 0 && args[0] == "battlegroup" {
-		return []byte(k.crOut), k.crErr
-	}
-	return nil, errors.New("unexpected get")
-}
-func (k *kubeFake) Patch(context.Context, string, string, string, string, string) error { return nil }
-func (k *kubeFake) DeletePods(context.Context, string, ...string) error                 { return nil }
-func (k *kubeFake) Exec(context.Context, string, string, ...string) ([]byte, error) {
-	return nil, nil
-}
-func (k *kubeFake) ExecPiped(context.Context, string, string, []byte, ...string) ([]byte, error) {
-	return nil, nil
+	return []byte(f.crOut), nil
 }
 
 const crJSON = `{"status":{"serverGroupPhase":"Running","database":{"phase":"Ready"},

@@ -79,3 +79,33 @@ func TestEventsUnknownChannel404(t *testing.T) {
 		t.Errorf("unknown channel returned 200")
 	}
 }
+
+func TestEventsHealthChannelAccepted(t *testing.T) {
+	srv := newTestServerWithHub(t, sse.NewHub())
+	ts := httptest.NewServer(srv.Handler)
+	defer ts.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", ts.URL+"/events/vm-a/health", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookie, Value: "tkn"})
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /events/vm-a/health: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		t.Fatalf("/events/vm-a/health returned 404 (unknown channel); want any other status")
+	}
+}
+
+func TestEventsTunnelChannelRejected(t *testing.T) {
+	srv := newTestServerWithHub(t, sse.NewHub())
+	req := httptest.NewRequest("GET", "/events/vm-a/tunnel", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookie, Value: "tkn"})
+	w := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("/events/vm-a/tunnel returned %d, want 404", w.Code)
+	}
+}

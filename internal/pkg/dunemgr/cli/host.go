@@ -10,7 +10,6 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/hostpool"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/probe"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/tunnel"
 	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
 
@@ -46,9 +45,9 @@ func runHostList(stdout io.Writer) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tSSH-ALIAS\tFQDN")
+	fmt.Fprintln(tw, "NAME\tSSH-ALIAS")
 	for _, h := range all {
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", h.Name, h.SSHAlias, h.FQDN)
+		fmt.Fprintf(tw, "%s\t%s\n", h.Name, h.SSHAlias)
 	}
 	return tw.Flush()
 }
@@ -70,7 +69,7 @@ func runHostAdd(ctx context.Context, stdout, _ io.Writer, args []string) error {
 		return err
 	}
 	defer s.Close()
-	m := &hostpool.Manager{Store: s, SSH: ssh.NewClient()}
+	m := &hostpool.Manager{Store: s}
 	if err := m.Register(ctx, name, alias); err != nil {
 		return err
 	}
@@ -104,13 +103,7 @@ func runHostProbe(ctx context.Context, stdout, _ io.Writer, args []string) error
 		return err
 	}
 	defer s.Close()
-	sshc := ssh.NewClient()
-	tm := &tunnel.Manager{SSH: sshc}
-	if err := tm.Connect(ctx, args[0]); err != nil {
-		return fmt.Errorf("connect: %w", err)
-	}
-	defer func() { _ = tm.Disconnect(ctx, args[0]) }()
-	snap, err := probe.Probe(ctx, s, tm, args[0])
+	snap, err := probe.Probe(ctx, s, ssh.NewClient(), args[0])
 	if err != nil {
 		return err
 	}

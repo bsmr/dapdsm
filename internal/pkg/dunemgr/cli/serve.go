@@ -16,7 +16,6 @@ import (
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/server"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/sse"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/tunnel"
 	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
 
@@ -50,7 +49,6 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 	defer st.Close()
 
 	sshClient := ssh.NewClient()
-	tm := &tunnel.Manager{SSH: sshClient}
 	hub := sse.NewHub()
 	poller := &sse.Poller{
 		Hub: hub,
@@ -66,10 +64,9 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 			return names, nil
 		},
 		Probe: func(ctx context.Context, host string) (store.StatusSnapshot, error) {
-			return probe.Probe(ctx, st, tm, host)
+			return probe.Probe(ctx, st, sshClient, host)
 		},
-		Tunnel: tm.IsConnected,
-		Audit:  func() ([]store.AuditEntry, error) { return st.ListAudit(0) },
+		Audit: func() ([]store.AuditEntry, error) { return st.ListAudit(0) },
 	}
 	scheduleMgr := schedule.NewManager(
 		&broadcast.Runner{SSH: sshClient, Store: st},

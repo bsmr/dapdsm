@@ -20,7 +20,7 @@ func drain(t *testing.T, ch <-chan Event) (Event, bool) {
 	}
 }
 
-func newTestPoller(hub *Hub, snap store.StatusSnapshot, up bool, audit []store.AuditEntry) *Poller {
+func newTestPoller(hub *Hub, snap store.StatusSnapshot, audit []store.AuditEntry) *Poller {
 	return &Poller{
 		Hub:   hub,
 		Hosts: func() ([]string, error) { return []string{"vm-a"}, nil },
@@ -29,14 +29,13 @@ func newTestPoller(hub *Hub, snap store.StatusSnapshot, up bool, audit []store.A
 			s.Host = host
 			return s, nil
 		},
-		Tunnel: func(string) bool { return up },
-		Audit:  func() ([]store.AuditEntry, error) { return audit, nil },
+		Audit: func() ([]store.AuditEntry, error) { return audit, nil },
 	}
 }
 
 func TestPollerPublishesBGOnFirstTick(t *testing.T) {
 	hub := NewHub()
-	p := newTestPoller(hub, store.StatusSnapshot{BGState: "RUNNING", PodReady: 3, PodTotal: 3}, true, nil)
+	p := newTestPoller(hub, store.StatusSnapshot{BGState: "RUNNING", PodReady: 3, PodTotal: 3}, nil)
 	ch, cancel := hub.Subscribe("bg/vm-a")
 	defer cancel()
 	st := newPollState()
@@ -49,7 +48,7 @@ func TestPollerPublishesBGOnFirstTick(t *testing.T) {
 
 func TestPollerSuppressesUnchangedBG(t *testing.T) {
 	hub := NewHub()
-	p := newTestPoller(hub, store.StatusSnapshot{BGState: "RUNNING", PodReady: 3, PodTotal: 3}, true, nil)
+	p := newTestPoller(hub, store.StatusSnapshot{BGState: "RUNNING", PodReady: 3, PodTotal: 3}, nil)
 	ch, cancel := hub.Subscribe("bg/vm-a")
 	defer cancel()
 	st := newPollState()
@@ -61,23 +60,36 @@ func TestPollerSuppressesUnchangedBG(t *testing.T) {
 	}
 }
 
-func TestPollerPublishesTunnelTransition(t *testing.T) {
+func TestPollerPublishesHealthOnFirstTick(t *testing.T) {
 	hub := NewHub()
-	p := newTestPoller(hub, store.StatusSnapshot{BGState: "RUNNING"}, true, nil)
-	ch, cancel := hub.Subscribe("tunnel/vm-a")
+	p := newTestPoller(hub, store.StatusSnapshot{BGState: "RUNNING", PodReady: 2, PodTotal: 2}, nil)
+	ch, cancel := hub.Subscribe("health/vm-a")
 	defer cancel()
 	st := newPollState()
 	p.Tick(context.Background(), st)
 	ev, ok := drain(t, ch)
-	if !ok || !strings.Contains(ev.Data, "true") {
-		t.Errorf("tunnel event=%+v ok=%v", ev, ok)
+	if !ok || !strings.Contains(ev.Data, `"ok":true`) {
+		t.Errorf("health event=%+v ok=%v", ev, ok)
+	}
+}
+
+func TestPollerHealthReflectsError(t *testing.T) {
+	hub := NewHub()
+	p := newTestPoller(hub, store.StatusSnapshot{BGState: "UNKNOWN", Error: "boom"}, nil)
+	ch, cancel := hub.Subscribe("health/vm-a")
+	defer cancel()
+	st := newPollState()
+	p.Tick(context.Background(), st)
+	ev, ok := drain(t, ch)
+	if !ok || !strings.Contains(ev.Data, `"ok":false`) || !strings.Contains(ev.Data, "boom") {
+		t.Errorf("health event=%+v ok=%v", ev, ok)
 	}
 }
 
 func TestPollerPublishesNewAuditEntryForHost(t *testing.T) {
 	hub := NewHub()
 	base := []store.AuditEntry{{Host: "vm-a", Action: "old", Result: "ok"}}
-	p := newTestPoller(hub, store.StatusSnapshot{BGState: "RUNNING"}, true, base)
+	p := newTestPoller(hub, store.StatusSnapshot{BGState: "RUNNING"}, base)
 	ch, cancel := hub.Subscribe("actions/vm-a")
 	defer cancel()
 	st := newPollState()
@@ -104,8 +116,7 @@ func TestPollerPrunesRemovedHost(t *testing.T) {
 		Probe: func(_ context.Context, h string) (store.StatusSnapshot, error) {
 			return store.StatusSnapshot{Host: h, BGState: "RUNNING"}, nil
 		},
-		Tunnel: func(string) bool { return true },
-		Audit:  func() ([]store.AuditEntry, error) { return nil, nil },
+		Audit: func() ([]store.AuditEntry, error) { return nil, nil },
 	}
 	st := newPollState()
 	p.Tick(context.Background(), st) // records vm-a
@@ -114,8 +125,8 @@ func TestPollerPrunesRemovedHost(t *testing.T) {
 	if _, ok := st.lastBG["vm-a"]; ok {
 		t.Error("lastBG still holds removed host vm-a")
 	}
-	if _, ok := st.lastTunnel["vm-a"]; ok {
-		t.Error("lastTunnel still holds removed host vm-a")
+	if _, ok := st.lastHealth["vm-a"]; ok {
+		t.Error("lastHealth still holds removed host vm-a")
 	}
 }
 
@@ -127,7 +138,7 @@ func TestPollerPublishesOnServerDetailChange(t *testing.T) {
 			{Map: "Overmap", Phase: "Running", Ready: true, Restarts: 0},
 		}},
 	}
-	p := newTestPoller(hub, base, true, nil)
+	p := newTestPoller(hub, base, nil)
 	ch, cancel := hub.Subscribe("bg/vm-a")
 	defer cancel()
 	st := newPollState()

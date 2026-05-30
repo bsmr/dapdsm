@@ -16,6 +16,13 @@ import (
 	"strings"
 )
 
+// Getter is the read-only subset of Runner. Helpers that only read CRs
+// accept this so any kubectl transport (local CmdRunner or an SSH-backed
+// getter) can satisfy them.
+type Getter interface {
+	Get(ctx context.Context, args ...string) ([]byte, error)
+}
+
 // Runner is the subset of kubectl(1) that dunectl needs. It exists so
 // tests can supply an in-memory fake instead of shelling out.
 type Runner interface {
@@ -38,8 +45,8 @@ type CmdRunner struct {
 	Bin string
 	// Kubeconfig, when non-empty, is passed as --kubeconfig=<path> on
 	// every invocation. Empty inherits kubectl's own resolution
-	// (KUBECONFIG env, then ~/.kube/config) — the dunectl-on-node case.
-	// dunemgr sets it to the per-host SSH-tunnel kubeconfig.
+	// (KUBECONFIG env, then ~/.kube/config) — the on-node case, where
+	// kubectl resolves the node's own k3s kubeconfig.
 	Kubeconfig string
 	// Stderr receives the kubectl command's stderr stream. nil discards.
 	Stderr io.Writer
@@ -140,7 +147,7 @@ func (c *CmdRunner) DeletePods(ctx context.Context, namespace string, selectors 
 
 // FindBattleGroupNamespace returns the first namespace whose name has the
 // funcom-seabass- prefix. Errors when none exists.
-func FindBattleGroupNamespace(ctx context.Context, r Runner) (string, error) {
+func FindBattleGroupNamespace(ctx context.Context, r Getter) (string, error) {
 	out, err := r.Get(ctx, "ns", "--no-headers", "-o", "custom-columns=NAME:.metadata.name")
 	if err != nil {
 		return "", err

@@ -13,7 +13,7 @@ import (
 // probeStatus resolves the BattleGroup namespace, fetches the CR, and
 // parses its observed status. The runner is injected so callers (and
 // tests) control transport.
-func probeStatus(ctx context.Context, r kube.Runner) (battlegroup.Status, error) {
+func probeStatus(ctx context.Context, r kube.Getter) (battlegroup.Status, error) {
 	ns, err := kube.FindBattleGroupNamespace(ctx, r)
 	if err != nil {
 		return battlegroup.Status{}, err

@@ -19,7 +19,6 @@ type Poller struct {
 	Hub      *Hub
 	Hosts    func() ([]string, error)
 	Probe    func(ctx context.Context, host string) (store.StatusSnapshot, error)
-	Tunnel   func(host string) bool
 	Audit    func() ([]store.AuditEntry, error)
 	Interval time.Duration // 0 => DefaultInterval
 }
@@ -27,14 +26,14 @@ type Poller struct {
 // pollState carries the previous tick's values for change detection.
 type pollState struct {
 	lastBG     map[string]string
-	lastTunnel map[string]bool
+	lastHealth map[string]string
 	auditSeen  int // -1 = uninitialised
 }
 
 func newPollState() *pollState {
 	return &pollState{
 		lastBG:     map[string]string{},
-		lastTunnel: map[string]bool{},
+		lastHealth: map[string]string{},
 		auditSeen:  -1,
 	}
 }
@@ -46,8 +45,10 @@ type bgEvent struct {
 	Error string `json:"error,omitempty"`
 }
 
-type tunnelEvent struct {
-	Up bool `json:"up"`
+type healthEvent struct {
+	OK       bool   `json:"ok"`
+	ProbedAt string `json:"probedAt"`
+	Error    string `json:"error,omitempty"`
 }
 
 type actionEvent struct {
@@ -73,11 +74,16 @@ func (p *Poller) Tick(ctx context.Context, st *pollState) {
 			p.Hub.Publish("bg/"+host, Event{Data: string(data)})
 		}
 
-		up := p.Tunnel(host)
-		if prev, ok := st.lastTunnel[host]; !ok || prev != up {
-			st.lastTunnel[host] = up
-			data, _ := json.Marshal(tunnelEvent{Up: up})
-			p.Hub.Publish("tunnel/"+host, Event{Data: string(data)})
+		ok := snap.BGState != "UNKNOWN" && snap.Error == ""
+		hkey := fmt.Sprintf("%v|%s|%d", ok, snap.Error, snap.ProbedAt.Unix())
+		if st.lastHealth[host] != hkey {
+			st.lastHealth[host] = hkey
+			data, _ := json.Marshal(healthEvent{
+				OK:       ok,
+				ProbedAt: snap.ProbedAt.Format(time.RFC3339),
+				Error:    snap.Error,
+			})
+			p.Hub.Publish("health/"+host, Event{Data: string(data)})
 		}
 	}
 
@@ -105,9 +111,9 @@ func (p *Poller) Tick(ctx context.Context, st *pollState) {
 			delete(st.lastBG, h)
 		}
 	}
-	for h := range st.lastTunnel {
+	for h := range st.lastHealth {
 		if _, ok := live[h]; !ok {
-			delete(st.lastTunnel, h)
+			delete(st.lastHealth, h)
 		}
 	}
 }
