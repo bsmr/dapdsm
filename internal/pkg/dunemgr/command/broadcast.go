@@ -1,4 +1,5 @@
-package cli
+// Package command — broadcast subcommand.
+package command
 
 import (
 	"context"
@@ -8,23 +9,18 @@ import (
 	"time"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/broadcast"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 )
 
 // broadcastCmd publishes an in-game notice or shutdown announcement
 // to the BattleGroup running on the named host.
-func broadcastCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func broadcastCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
 		fmt.Fprintln(stderr, "usage: dunemgr broadcast <host> <notice|shutdown|shutdown-cancel> [flags]")
 		return fmt.Errorf("broadcast: usage: %w", ErrUsage)
 	}
 	host, kind, rest := args[0], args[1], args[2:]
-	st, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer st.Close()
-	r := &broadcast.Runner{SSH: ssh.NewClient(), Store: st}
+	r := &broadcast.Runner{SSH: c.SSH, Store: c.Store}
 	switch kind {
 	case "notice":
 		fs := flag.NewFlagSet("notice", flag.ContinueOnError)

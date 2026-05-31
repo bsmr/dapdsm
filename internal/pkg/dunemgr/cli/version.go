@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/config"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 )
 
 // versionCmd prints the dunemgr build identity.
@@ -17,7 +19,7 @@ func versionCmd(_ context.Context, _ []string, stdout, _ io.Writer) error {
 // regenTokenCmd rotates the bearer token in the config dir and prints the
 // new value plus where it was written.
 func regenTokenCmd(_ context.Context, _ []string, stdout, _ io.Writer) error {
-	dir, err := configDir()
+	dir, err := core.ConfigDir(os.Getenv)
 	if err != nil {
 		return err
 	}

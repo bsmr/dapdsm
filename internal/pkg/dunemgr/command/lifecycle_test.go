@@ -1,4 +1,4 @@
-package cli
+package command
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 
 func TestLifecycleUsage(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if err := lifecycleCmd(context.Background(), nil, &stdout, &stderr); err == nil {
+	if err := lifecycleCmd(context.Background(), nil, nil, &stdout, &stderr); err == nil {
 		t.Error("lifecycle no args: err=nil, want non-nil")
 	}
 	if !strings.Contains(stderr.String(), "usage") {
@@ -19,7 +19,7 @@ func TestLifecycleUsage(t *testing.T) {
 
 func TestLifecycleRejectsInvalidAction(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if err := lifecycleCmd(context.Background(), []string{"vm-a", "destroy"}, &stdout, &stderr); err == nil {
+	if err := lifecycleCmd(context.Background(), nil, []string{"vm-a", "destroy"}, &stdout, &stderr); err == nil {
 		t.Error("lifecycle invalid action: err=nil, want non-nil")
 	}
 }
