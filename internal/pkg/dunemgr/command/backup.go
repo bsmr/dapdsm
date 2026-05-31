@@ -1,4 +1,5 @@
-package cli
+// Package command — backup subcommand.
+package command
 
 import (
 	"context"
@@ -6,38 +7,24 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/backup"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 )
 
 // backupCmd creates, lists, or restores BattleGroup DB backups on a host.
 // Sub-commands: create, list, restore.
-func backupCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func backupCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 3 {
 		fmt.Fprintln(stderr, "usage: dunemgr backup <host> <bg> <create|list|restore> [args...]")
 		return fmt.Errorf("backup: usage: %w", ErrUsage)
 	}
 	host, bg, sub, rest := args[0], args[1], args[2], args[3:]
-	st, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer st.Close()
-	root, err := dataDir()
-	if err != nil {
-		return err
-	}
-	dir := filepath.Join(root, "backups")
+	dir := c.BackupDir
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	r := &backup.Runner{
-		SSH:     ssh.NewClient(),
-		Store:   st,
-		DataDir: dir,
-	}
+	r := &backup.Runner{SSH: c.SSH, Store: c.Store, DataDir: dir}
 	switch sub {
 	case "create":
 		if len(rest) < 1 {

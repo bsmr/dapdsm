@@ -1,4 +1,4 @@
-package cli
+package command
 
 import (
 	"context"
@@ -6,31 +6,20 @@ import (
 	"fmt"
 	"io"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/broadcast"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/lifecycle"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/schedule"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
 
 // shutdownCmd schedules, cancels, or queries a shutdown countdown on a host.
 // Sub-commands: schedule, cancel, status.
-func shutdownCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func shutdownCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
 		fmt.Fprintln(stderr, "usage: dunemgr shutdown <host> <schedule|cancel|status> [flags]")
 		return fmt.Errorf("shutdown: usage: %w", ErrUsage)
 	}
 	host, sub, rest := args[0], args[1], args[2:]
-	st, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer st.Close()
-	cli := ssh.NewClient()
-	mgr := schedule.NewManager(
-		&broadcast.Runner{SSH: cli, Store: st},
-		&lifecycle.Runner{SSH: cli, Store: st},
-		st, nil,
-	)
+	mgr := c.Schedule
 	switch sub {
 	case "schedule":
 		fs := flag.NewFlagSet("schedule", flag.ContinueOnError)
@@ -60,7 +49,7 @@ func shutdownCmd(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		fmt.Fprintf(stdout, "cancelled countdown on %s\n", host)
 		return nil
 	case "status":
-		rec, err := st.GetSchedule(host)
+		rec, err := c.Store.GetSchedule(host)
 		if err != nil {
 			fmt.Fprintf(stdout, "no pending shutdown on %s\n", host)
 			return nil

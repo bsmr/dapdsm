@@ -1,5 +1,5 @@
-// Package cli — host subcommand.
-package cli
+// Package command — host subcommand.
+package command
 
 import (
 	"context"
@@ -8,39 +8,34 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/hostpool"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/probe"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
 
 // hostCmd manages the host pool (list|add|rm|probe).
 // Diagnostic and usage text is written to stderr; real output (tables, probe
 // results) goes to stdout. Usage/validation errors are wrapped with ErrUsage.
-func hostCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func hostCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: dunemgr host <add|list|probe|rm> ...: %w", ErrUsage)
 	}
 	switch args[0] {
 	case "list":
-		return runHostList(stdout)
+		return runHostList(c, stdout)
 	case "add":
-		return runHostAdd(ctx, stdout, stderr, args[1:])
+		return runHostAdd(ctx, c, stdout, stderr, args[1:])
 	case "rm":
-		return runHostRm(stdout, args[1:])
+		return runHostRm(c, stdout, args[1:])
 	case "probe":
-		return runHostProbe(ctx, stdout, stderr, args[1:])
+		return runHostProbe(ctx, c, stdout, stderr, args[1:])
 	default:
 		return fmt.Errorf("unknown host subcommand %q: %w", args[0], ErrUsage)
 	}
 }
 
-func runHostList(stdout io.Writer) error {
-	s, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer s.Close()
-	all, err := s.ListHosts()
+func runHostList(c *core.Core, stdout io.Writer) error {
+	all, err := c.Store.ListHosts()
 	if err != nil {
 		return err
 	}
@@ -52,7 +47,7 @@ func runHostList(stdout io.Writer) error {
 	return tw.Flush()
 }
 
-func runHostAdd(ctx context.Context, stdout, _ io.Writer, args []string) error {
+func runHostAdd(ctx context.Context, c *core.Core, stdout, _ io.Writer, args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: dunemgr host add <name> [--ssh-alias=<alias>]: %w", ErrUsage)
 	}
@@ -64,12 +59,7 @@ func runHostAdd(ctx context.Context, stdout, _ io.Writer, args []string) error {
 			alias = a[len(p):]
 		}
 	}
-	s, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer s.Close()
-	m := &hostpool.Manager{Store: s}
+	m := &hostpool.Manager{Store: c.Store}
 	if err := m.Register(ctx, name, alias); err != nil {
 		return err
 	}
@@ -77,16 +67,11 @@ func runHostAdd(ctx context.Context, stdout, _ io.Writer, args []string) error {
 	return nil
 }
 
-func runHostRm(stdout io.Writer, args []string) error {
+func runHostRm(c *core.Core, stdout io.Writer, args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: dunemgr host rm <name>: %w", ErrUsage)
 	}
-	s, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer s.Close()
-	m := &hostpool.Manager{Store: s}
+	m := &hostpool.Manager{Store: c.Store}
 	if err := m.Delete(args[0]); err != nil {
 		return err
 	}
@@ -94,16 +79,11 @@ func runHostRm(stdout io.Writer, args []string) error {
 	return nil
 }
 
-func runHostProbe(ctx context.Context, stdout, _ io.Writer, args []string) error {
+func runHostProbe(ctx context.Context, c *core.Core, stdout, _ io.Writer, args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: dunemgr host probe <name>: %w", ErrUsage)
 	}
-	s, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer s.Close()
-	snap, err := probe.Probe(ctx, s, ssh.NewClient(), args[0])
+	snap, err := probe.Probe(ctx, c.Store, c.SSH, args[0])
 	if err != nil {
 		return err
 	}

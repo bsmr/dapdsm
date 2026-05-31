@@ -1,4 +1,4 @@
-package cli
+package command
 
 import (
 	"context"
@@ -7,24 +7,19 @@ import (
 	"strconv"
 	"strings"
 
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
 
 // dbCmd runs a DB query (exec|columns|slow) against the BattleGroup database
 // on the named host via SSH + kubectl exec into the database pod.
-func dbCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func dbCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
 		fmt.Fprintln(stderr, "usage: dunemgr db <host> exec <sql>")
 		return fmt.Errorf("db: usage: %w", ErrUsage)
 	}
 	host, sub, rest := args[0], args[1], args[2:]
-	st, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer st.Close()
-	r := &dbquery.Runner{SSH: ssh.NewClient(), Store: st}
+	r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
 	switch sub {
 	case "exec":
 		if len(rest) < 1 {
