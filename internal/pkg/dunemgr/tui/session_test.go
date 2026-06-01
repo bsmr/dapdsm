@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -101,4 +102,42 @@ func TestCommandBarSession(t *testing.T) {
 		t.Errorf("vm-b lastAction = %q, want it to mention restart", got)
 	}
 	wantView("7 action", "restart → ok")
+
+	// Step 8: ':player <host> search <query>' enters command mode, types the full
+	// command, and verifies the bar is in command mode with the expected content
+	// before Enter is pressed (dispatch flow verification without a real SSH conn).
+	keys(":")
+	if m.mode != modeCmd {
+		t.Fatalf("step 8: ':' did not enter command mode")
+	}
+	keys("player vm-a search ")
+	wantView("8 player-search", ":player vm-a search")
+
+	// Step 9: ':admin <host> item <player> <prefix>' + Tab offers catalog item ids.
+	// Reset the command bar, then type an admin item command prefix.
+	apply(tea.KeyMsg{Type: tea.KeyEsc})
+	keys(":")
+	keys("admin vm-a item test-player-id T6_Augment_Ac")
+	// The suggestion line must contain a known item id with that prefix.
+	v := m.View()
+	if !strings.Contains(v, "T6_Augment_Acuracy1") {
+		t.Errorf("[9 catalog suggest] View() missing T6_Augment_Acuracy1 in suggestion line:\n%s", v)
+	}
+	// Tab-complete should advance toward the known id.
+	apply(tea.KeyMsg{Type: tea.KeyTab})
+	wantView("9 catalog tab", "T6_Augment_Acuracy1")
+
+	// Step 10: ':admin <host> kick <player>' without --confirm → dispatches and
+	// the result pane must mention the gating requirement.
+	apply(tea.KeyMsg{Type: tea.KeyEsc})
+	keys(":")
+	keys("admin vm-a kick test-player-id")
+	apply(tea.KeyMsg{Type: tea.KeyEnter})
+	// The command bar dispatch is async (tea.Cmd); inject the cmdResultMsg
+	// directly to simulate the returned error from the runner gate.
+	apply(cmdResultMsg{
+		out: "",
+		err: fmt.Errorf("admin kick: verb is destructive; pass --confirm"),
+	})
+	wantView("10 kick gate", "destructive")
 }

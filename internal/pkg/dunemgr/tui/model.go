@@ -264,8 +264,7 @@ func (m model) View() string {
 	if m.mode == modeCmd {
 		bottom = m.input.View() + "\n"
 		if sugg := suggest(m.input.Value(), m.hosts); len(sugg) > 0 {
-			line := strings.Join(sugg, "  ")
-			bottom += styleErr.Render(line) + "\n"
+			bottom += styleErr.Render(renderSuggestions(sugg)) + "\n"
 		}
 	} else {
 		bottom = "[:] command  [tab] focus  [q] quit\n"

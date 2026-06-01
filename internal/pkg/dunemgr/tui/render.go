@@ -78,6 +78,31 @@ func renderOutput(out string) string {
 	return "── result ──\n" + out + "────────────\n"
 }
 
+// suggestLineCap is the maximum number of candidates shown in the suggestion
+// line before a "(+N more)" suffix is appended.
+const suggestLineCap = 12
+
+// renderSuggestions formats the completion candidate list for the suggestion
+// line below the command bar. It caps display at suggestLineCap entries so that
+// catalog-backed slots (which may have thousands of candidates) do not flood the
+// bottom of the screen.
+func renderSuggestions(candidates []string) string {
+	if len(candidates) == 0 {
+		return ""
+	}
+	visible := candidates
+	overflow := 0
+	if len(candidates) > suggestLineCap {
+		visible = candidates[:suggestLineCap]
+		overflow = len(candidates) - suggestLineCap
+	}
+	line := strings.Join(visible, "  ")
+	if overflow > 0 {
+		line += fmt.Sprintf("  … (+%d)", overflow)
+	}
+	return line
+}
+
 func valOr(s, def string) string {
 	if s == "" {
 		return def

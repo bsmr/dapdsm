@@ -18,14 +18,36 @@ type fakeRunner struct {
 }
 
 func (f *fakeRunner) Run(ctx context.Context, name string, args ...string) (ssh.Result, error) {
+	// After the shell-quoting fix ssh.Client passes args as:
+	//   ["-o", "BatchMode=yes", "--", host, "<quoted remote cmd>"]
+	// The last element contains all remote words individually quoted.
+	// Build the joined string and also match against the raw remote token
+	// so pattern keys like "get databasedeployment" still work.
 	joined := name + " " + strings.Join(args, " ")
 	f.calls = append(f.calls, joined)
 	for k, v := range f.stdoutMap {
 		if strings.Contains(joined, k) {
 			return ssh.Result{Stdout: v, ExitCode: 0}, nil
 		}
+		// Also match when each word in the key is individually shell-quoted
+		// (e.g. "get databasedeployment" → "'get' 'databasedeployment'").
+		quoted := quotedPattern(k)
+		if strings.Contains(joined, quoted) {
+			return ssh.Result{Stdout: v, ExitCode: 0}, nil
+		}
 	}
 	return ssh.Result{ExitCode: 0}, nil
+}
+
+// quotedPattern converts a space-separated key into the shell-quoted form
+// produced by ssh.Client after the shell-quoting fix, e.g.
+// "get databasedeployment" → "'get' 'databasedeployment'".
+func quotedPattern(key string) string {
+	words := strings.Fields(key)
+	for i, w := range words {
+		words[i] = "'" + strings.ReplaceAll(w, "'", `'\''`) + "'"
+	}
+	return strings.Join(words, " ")
 }
 
 func (f *fakeRunner) RunWithStdin(ctx context.Context, stdin []byte, name string, args ...string) (ssh.Result, error) {

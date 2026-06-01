@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,14 @@ type okRunner struct{ calls []string }
 func (r *okRunner) Run(_ context.Context, name string, args ...string) (ssh.Result, error) {
 	r.calls = append(r.calls, name)
 	r.calls = append(r.calls, args...)
+	// Return the mq-game pod in ns/pod format (-A path) when the MQ pod list is
+	// queried so that broadcast.PublishInner can pick the game broker.
+	// After the shell-quoting fix the args contain a single quoted remote-command
+	// token; match against it directly.
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, "'get'") && strings.Contains(joined, "'pods'") && strings.Contains(joined, "messagequeue") {
+		return ssh.Result{Stdout: "funcom-seabass-x/seabass-mq-game-sts-0\n", ExitCode: 0}, nil
+	}
 	return ssh.Result{Stdout: "ok", ExitCode: 0}, nil
 }
 func (r *okRunner) RunWithStdin(_ context.Context, _ []byte, name string, args ...string) (ssh.Result, error) {
@@ -111,9 +120,12 @@ func TestExecuteRunsLifecycleAndCleansUp(t *testing.T) {
 	if _, err := s.GetSchedule("vm-a"); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("record not cleaned after execute: %v", err)
 	}
+	// After the shell-quoting fix the binary path is embedded inside a quoted
+	// remote-command token (e.g. "'/home/dune/.dune/bin/battlegroup' 'stop'"),
+	// so we cannot match it as an exact element. Check for containment instead.
 	found := false
 	for _, c := range rr.calls {
-		if c == lifecycle.DefaultBattlegroupBin {
+		if strings.Contains(c, lifecycle.DefaultBattlegroupBin) {
 			found = true
 		}
 	}
