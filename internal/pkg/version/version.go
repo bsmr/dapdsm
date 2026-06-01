@@ -1,6 +1,7 @@
-// Package version exposes the dunectl build identity (semantic version,
-// VCS revision, build date, Go runtime). Values come from one of three
-// sources, in order of precedence:
+// Package version exposes the dapdsm build identity (semantic version, VCS
+// revision, build date, Go runtime) shared by both binaries, dunectl and
+// dunemgr — they live in one module and release in lockstep, so they carry one
+// version. Values come from one of three sources, in order of precedence:
 //
 //  1. ldflags injected by the build (-X .../version.Commit=abc, etc.)
 //  2. Go's automatic vcs.* build settings (debug.ReadBuildInfo) — populated
@@ -13,8 +14,8 @@ import (
 	"runtime/debug"
 )
 
-// Semantic version of the dunectl tool itself. Bump per release.
-var Version = "0.1.0-dev"
+// Semantic version of the dapdsm tools (dunectl + dunemgr). Bump per release.
+var Version = "0.1.3"
 
 // Short git revision. Empty when built from an unclean tree or outside git.
 var Commit = ""
@@ -50,9 +51,10 @@ func init() {
 	}
 }
 
-// String renders one human-readable line summarising the build identity.
-func String() string {
-	s := "dunectl " + Version
+// String renders one human-readable line summarising the build identity for
+// the named tool (e.g. "dunectl" or "dunemgr").
+func String(tool string) string {
+	s := tool + " " + Version
 	if Commit != "" {
 		s += " (" + Commit
 		if Modified == "true" {
