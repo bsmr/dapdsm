@@ -127,3 +127,32 @@ func TestTabCyclesFocus(t *testing.T) {
 		t.Fatal("tab twice should return to initial focus")
 	}
 }
+
+func TestTabCompletesVerbInCommandMode(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.mode = modeCmd
+	m.input.SetValue("lifec")
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if got := m2.(model).input.Value(); got != "lifecycle " {
+		t.Fatalf("Tab complete = %q, want \"lifecycle \"", got)
+	}
+}
+
+func TestHelpCommandFillsOutputPane(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.mode = modeCmd
+	m.input.SetValue("help")
+	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm := m2.(model)
+	if mm.mode != modeNav {
+		t.Fatal("help should return to nav mode")
+	}
+	if cmd != nil {
+		t.Fatal("help is a built-in; it must NOT dispatch (cmd should be nil)")
+	}
+	for _, want := range []string{"lifecycle", "backup", "shutdown"} {
+		if !strings.Contains(mm.output, want) {
+			t.Errorf("help output missing %q:\n%s", want, mm.output)
+		}
+	}
+}
