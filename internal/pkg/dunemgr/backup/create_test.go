@@ -22,11 +22,16 @@ type sshFake struct {
 func (f *sshFake) Run(ctx context.Context, name string, args ...string) (ssh.Result, error) {
 	joined := name + " " + strings.Join(args, " ")
 	f.runCalls = append(f.runCalls, joined)
-	if name == "ssh" && strings.Contains(joined, "battlegroup backup") {
-		if !f.wrapperOK {
-			return ssh.Result{Stderr: "boom", ExitCode: 1}, nil
+	if name == "ssh" {
+		// After the shell-quoting fix the binary path and "backup" verb are
+		// individually quoted: e.g. "'/home/dune/.dune/bin/battlegroup' 'backup'".
+		// Match using the shared suffix of the binary name + adjacent verb.
+		if strings.Contains(joined, "battlegroup") && strings.Contains(joined, "'backup'") {
+			if !f.wrapperOK {
+				return ssh.Result{Stderr: "boom", ExitCode: 1}, nil
+			}
+			return ssh.Result{Stdout: "backup ok\n", ExitCode: 0}, nil
 		}
-		return ssh.Result{Stdout: "backup ok\n", ExitCode: 0}, nil
 	}
 	if name == "scp" {
 		// args[-2] is source, args[-1] is destination after `--`

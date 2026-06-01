@@ -19,9 +19,13 @@ type restoreFake struct {
 
 func (f *restoreFake) Run(ctx context.Context, name string, args ...string) (ssh.Result, error) {
 	joined := name + " " + strings.Join(args, " ")
-	if name == "ssh" && strings.Contains(joined, "battlegroup import") {
-		f.imported = true
-		return ssh.Result{Stdout: "imported\n", ExitCode: 0}, nil
+	if name == "ssh" {
+		// After the shell-quoting fix the binary path and "import" verb are
+		// individually quoted: e.g. "'/home/dune/.dune/bin/battlegroup' 'import'".
+		if strings.Contains(joined, "battlegroup") && strings.Contains(joined, "'import'") {
+			f.imported = true
+			return ssh.Result{Stdout: "imported\n", ExitCode: 0}, nil
+		}
 	}
 	if name == "scp" && len(args) >= 2 {
 		f.scpUploads = append(f.scpUploads, args[len(args)-1])

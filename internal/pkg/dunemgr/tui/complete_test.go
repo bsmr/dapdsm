@@ -60,6 +60,72 @@ func TestCompleteUnknownVerbNoCandidates(t *testing.T) {
 	}
 }
 
+// TestSuggestAdminCatalog_EmptyToken verifies that no catalog candidates are
+// returned for an empty token at the name position.
+func TestSuggestAdminCatalog_EmptyToken(t *testing.T) {
+	// "admin vm-a item player-x " — trailing space means next token is empty
+	got := suggest("admin vm-a item player-x ", nil)
+	if got != nil {
+		t.Errorf("catalog slot with empty token: expected nil, got %d candidates", len(got))
+	}
+}
+
+// TestSuggestAdminCatalog_PrefixFiltered verifies that a prefix at the name
+// position returns only matching catalog ids.
+func TestSuggestAdminCatalog_PrefixFiltered(t *testing.T) {
+	// "admin vm-a item player-x T6_Augment_Ac" should match T6_Augment_Acuracy1
+	got := suggest("admin vm-a item player-x T6_Augment_Ac", nil)
+	if len(got) == 0 {
+		t.Fatal("catalog suggest with prefix T6_Augment_Ac: got no candidates")
+	}
+	found := false
+	for _, c := range got {
+		if c == "T6_Augment_Acuracy1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("T6_Augment_Acuracy1 not in suggest results: %v", got)
+	}
+}
+
+// TestCompleteAdminCatalog_PrefixComplete verifies that Tab-complete on a
+// unique catalog prefix inserts the full value and a trailing space.
+// "Skills.Ability.Hypersp" is a unique prefix for "Skills.Ability.Hypersprint".
+func TestCompleteAdminCatalog_PrefixComplete(t *testing.T) {
+	line, cands := complete("admin vm-a skill player-x Skills.Ability.Hypersp", nil)
+	if len(cands) == 0 {
+		t.Fatal("complete on unique skill prefix: no candidates")
+	}
+	// Unique match → complete to the full value + trailing space.
+	if len(cands) == 1 {
+		if line != "admin vm-a skill player-x Skills.Ability.Hypersprint " {
+			t.Errorf("unique catalog complete: got %q, want full value + space", line)
+		}
+	} else {
+		// Multiple matches: line must at least have advanced beyond the input.
+		if line == "admin vm-a skill player-x Skills.Ability.Hypersp" {
+			t.Errorf("ambiguous catalog complete: line did not advance, got %q", line)
+		}
+	}
+}
+
+// TestSuggestAdminCatalog_SkillVerb verifies that the skill catalog is used
+// when the admin sub-verb is "skill".
+func TestSuggestAdminCatalog_SkillVerb(t *testing.T) {
+	got := suggest("admin vm-a skill player-x Skills.Ability.H", nil)
+	if len(got) == 0 {
+		t.Fatal("skill catalog suggest: got no candidates")
+	}
+	// All results should be skill module ids (no item ids).
+	for _, c := range got {
+		if len(c) > 0 && c[0] == 'T' {
+			// item ids start with 'T' (e.g. T6_...), skill ids start with 'Skills.'
+			t.Errorf("skill catalog returned non-skill id: %q", c)
+		}
+	}
+}
+
 func contains(ss []string, s string) bool {
 	for _, x := range ss {
 		if x == s {

@@ -32,10 +32,19 @@ func (r *recordingSSHRunner) Run(_ context.Context, name string, args ...string)
 		dst := args[len(args)-1]
 		_ = os.WriteFile(dst, []byte("dummy"), 0o644)
 	}
+	joined := strings.Join(args, " ")
 	// discoverDB issues `kubectl get databasedeployment` and expects a
 	// four-field jsonpath response: namespace, name, port, superUser.
-	if strings.Contains(strings.Join(args, " "), "databasedeployment") {
+	// "databasedeployment" appears literally inside the single quoted remote token.
+	if strings.Contains(joined, "databasedeployment") {
 		return ssh.Result{Stdout: "funcom-seabass-x funcom-dunedb 15432 postgres\n", ExitCode: 0}, nil
+	}
+	// Return the mq-game pod in ns/pod format (-A path) for the MQ pod list so
+	// that PublishInner (called via broadcast → schedule) can pick the game broker.
+	// After the shell-quoting fix the args are individually quoted words;
+	// "rabbitmq" still appears as a literal substring inside the quoted token.
+	if strings.Contains(joined, "'pods'") && strings.Contains(joined, "messagequeue") {
+		return ssh.Result{Stdout: "funcom-seabass-x/seabass-mq-game-sts-0\n", ExitCode: 0}, nil
 	}
 	return ssh.Result{Stdout: "started\n", ExitCode: 0}, nil
 }

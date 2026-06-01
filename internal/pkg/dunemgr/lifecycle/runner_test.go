@@ -54,8 +54,18 @@ func TestRunHappyPath(t *testing.T) {
 	if fr.gotName != "ssh" {
 		t.Errorf("exec name=%q, want ssh", fr.gotName)
 	}
-	if !strings.Contains(strings.Join(fr.gotArgs, " "), "vm-a /home/dune/.dune/bin/battlegroup start") {
-		t.Errorf("args=%v, want trailing 'vm-a /home/dune/.dune/bin/battlegroup start'", fr.gotArgs)
+	// After the shell-quoting fix the remote command is a single quoted token at
+	// gotArgs[4]; args[3] is the host. Assert that the remote token contains
+	// both the binary path and the action verb.
+	if len(fr.gotArgs) < 5 {
+		t.Fatalf("args=%v, want at least 5 elements (-o BatchMode=yes -- host <remote>)", fr.gotArgs)
+	}
+	remoteArg := fr.gotArgs[4]
+	if !strings.Contains(remoteArg, "/home/dune/.dune/bin/battlegroup") {
+		t.Errorf("remote arg %q missing battlegroup binary path", remoteArg)
+	}
+	if !strings.Contains(remoteArg, "start") {
+		t.Errorf("remote arg %q missing action 'start'", remoteArg)
 	}
 
 	entries, err := st.ListAudit(0)

@@ -20,7 +20,10 @@ type pipingRunner struct {
 
 func (r *pipingRunner) Run(ctx context.Context, name string, args ...string) (ssh.Result, error) {
 	joined := strings.Join(args, " ")
-	if strings.Contains(joined, "get databasedeployment") {
+	// After the shell-quoting fix each remote-command word is individually quoted
+	// in the single remote-command token; match both the unquoted and quoted forms.
+	if strings.Contains(joined, "get databasedeployment") ||
+		strings.Contains(joined, "'get' 'databasedeployment'") {
 		return ssh.Result{Stdout: r.podStdout, ExitCode: 0}, nil
 	}
 	return ssh.Result{ExitCode: 0}, nil
@@ -62,8 +65,17 @@ func TestExecPipesSQLAndRecordsAudit(t *testing.T) {
 	}
 	// Regression: psql must connect over TCP on the discovered port/user, in
 	// the discovered namespace — this is the bug this change fixes.
+	// After the shell-quoting fix each remote-command word is individually
+	// shell-quoted in the single remote-command token, so "-n funcom-seabass-x"
+	// appears as "'-n' 'funcom-seabass-x'" etc. Match quoted word-pairs.
 	argv := strings.Join(rr.argsSeen, " ")
-	for _, want := range []string{"-n funcom-seabass-x", "-h 127.0.0.1", "-p 15432", "-U postgres", "-d dune"} {
+	for _, want := range []string{
+		"'-n' 'funcom-seabass-x'",
+		"'-h' '127.0.0.1'",
+		"'-p' '15432'",
+		"'-U' 'postgres'",
+		"'-d' 'dune'",
+	} {
 		if !strings.Contains(argv, want) {
 			t.Errorf("psql argv %q missing %q", argv, want)
 		}

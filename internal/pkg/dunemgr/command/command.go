@@ -24,11 +24,13 @@ type Handler func(ctx context.Context, c *core.Core, argv []string, stdout, stde
 // table maps a verb to its handler. Handlers register here as they are
 // migrated; host-targeting verbs only (version/regen-token stay in cli).
 var table = map[string]Handler{
+	"admin":     adminCmd,
 	"backup":    backupCmd,
 	"broadcast": broadcastCmd,
 	"db":        dbCmd,
 	"host":      hostCmd,
 	"lifecycle": lifecycleCmd,
+	"player":    playerCmd,
 	"shutdown":  shutdownCmd,
 }
 

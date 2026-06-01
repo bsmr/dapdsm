@@ -28,7 +28,15 @@ func suggest(line string, hosts []string) []string {
 	} else if spec, ok := command.SpecFor(tokens[0]); ok {
 		// argument position: the command package owns the slot logic and returns
 		// the candidate strings (nil for freeform / out-of-range).
-		pool = spec.Candidates(pos-1, hosts)
+		// Pass the already-typed tokens so argCatalog slots can select the
+		// right catalog based on the admin sub-verb.
+		argPos := pos - 1
+		// Suppress catalog suggestions on empty token: the catalog can have
+		// thousands of entries, which would flood the suggestion line.
+		if spec.IsCatalogPos(argPos) && cur == "" {
+			return nil
+		}
+		pool = spec.Candidates(argPos, hosts, tokens...)
 	}
 
 	var out []string

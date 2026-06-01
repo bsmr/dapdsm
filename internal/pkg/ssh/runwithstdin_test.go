@@ -35,13 +35,23 @@ func TestRunWithStdinPipesPayload(t *testing.T) {
 	if !bytes.Equal(rr.gotStdin, payload) {
 		t.Errorf("stdin=%q, want %q", rr.gotStdin, payload)
 	}
-	// First arg must be "ssh", then BatchMode, then -- vm-a kubectl exec ...
+	// After the fix argv is: ["ssh", "-o", "BatchMode=yes", "--", "vm-a", <single remote token>]
+	// — 6 elements total, with the remote command as the last one.
 	if rr.gotArgs[0] != "ssh" {
 		t.Errorf("argv[0]=%q, want ssh", rr.gotArgs[0])
 	}
-	got := joinArgs(rr.gotArgs)
-	if !contains(got, "vm-a kubectl exec -i podname -- cat") {
-		t.Errorf("argv tail mismatch: %q", got)
+	if len(rr.gotArgs) != 6 {
+		t.Fatalf("argv len=%d, want 6; argv=%v", len(rr.gotArgs), rr.gotArgs)
+	}
+	if rr.gotArgs[4] != "vm-a" {
+		t.Errorf("argv[4]=%q, want vm-a", rr.gotArgs[4])
+	}
+	remoteArg := rr.gotArgs[5]
+	// Every component of the original command must appear in the single quoted remote token.
+	for _, want := range []string{"kubectl", "exec", "-i", "podname", "--", "cat"} {
+		if !contains(remoteArg, want) {
+			t.Errorf("remote arg %q missing component %q", remoteArg, want)
+		}
 	}
 }
 
@@ -50,6 +60,24 @@ func TestRunWithStdinRejectsFlagHost(t *testing.T) {
 	_, err := c.RunWithStdin(context.Background(), "-evil", nil, "kubectl")
 	if err == nil {
 		t.Error("RunWithStdin with flag-host err=nil, want non-nil")
+	}
+}
+
+// TestRunWithStdinRemoteArgIsSingleToken verifies that a multi-word arg
+// ends up as ONE element in the argv passed to the runner.
+func TestRunWithStdinRemoteArgIsSingleToken(t *testing.T) {
+	rr := &recordingStdinRunner{}
+	c := &Client{Runner: rr}
+	_, _ = c.RunWithStdin(context.Background(), "vm-a", nil, "kubectl", "exec", "-i", "pod", "--", "sh", "-lc", "echo foo; echo bar")
+
+	// argv: ["ssh", "-o", "BatchMode=yes", "--", "vm-a", <remote>]
+	if len(rr.gotArgs) != 6 {
+		t.Fatalf("argv len=%d, want 6; argv=%v", len(rr.gotArgs), rr.gotArgs)
+	}
+	remoteArg := rr.gotArgs[5]
+	// The multi-statement shell script must survive as one intact token.
+	if !contains(remoteArg, "echo foo; echo bar") {
+		t.Errorf("shell script not intact in remote arg: %q", remoteArg)
 	}
 }
 
