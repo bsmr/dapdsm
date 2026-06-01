@@ -168,10 +168,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = modeNav
 				m.input.Blur()
 				return m, nil
+			case tea.KeyTab:
+				completed, _ := complete(m.input.Value(), m.hosts)
+				m.input.SetValue(completed)
+				m.input.CursorEnd()
+				return m, nil
 			case tea.KeyEnter:
 				line := m.input.Value()
 				m.input.SetValue("")
 				m.input.Blur()
+				m.mode = modeNav
+				if fields := strings.Fields(line); len(fields) > 0 && fields[0] == helpVerb {
+					m.output = renderHelp(fields[1:])
+					return m, nil
+				}
 				return m, m.dispatch(line)
 			}
 			var cmd tea.Cmd
@@ -253,6 +263,10 @@ func (m model) View() string {
 	var bottom string
 	if m.mode == modeCmd {
 		bottom = m.input.View() + "\n"
+		if sugg := suggest(m.input.Value(), m.hosts); len(sugg) > 0 {
+			line := strings.Join(sugg, "  ")
+			bottom += styleErr.Render(line) + "\n"
+		}
 	} else {
 		bottom = "[:] command  [tab] focus  [q] quit\n"
 	}

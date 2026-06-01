@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
 )
 
 var (
@@ -81,4 +83,21 @@ func valOr(s, def string) string {
 		return def
 	}
 	return s
+}
+
+// renderHelp renders the verb list (or one verb's detail) for the :help built-in.
+func renderHelp(args []string) string {
+	if len(args) > 0 {
+		if s, ok := command.SpecFor(args[0]); ok {
+			return s.Usage() + "\n  " + s.Summary + "\n"
+		}
+		return "unknown verb: " + args[0] + "\n"
+	}
+	var b strings.Builder
+	b.WriteString("commands (Tab to complete):\n")
+	for _, s := range command.Specs() {
+		fmt.Fprintf(&b, "  %-44s %s\n", s.Usage(), s.Summary)
+	}
+	b.WriteString("  help [verb]                                  Show this help\n")
+	return b.String()
 }
