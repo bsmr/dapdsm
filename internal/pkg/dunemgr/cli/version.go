@@ -8,11 +8,12 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/config"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/internal/pkg/version"
 )
 
-// versionCmd prints the dunemgr build identity.
+// versionCmd prints the dunemgr build identity (shared dapdsm version package).
 func versionCmd(_ context.Context, _ []string, stdout, _ io.Writer) error {
-	fmt.Fprintf(stdout, "dunemgr v0.0.0 (foundation)\n")
+	fmt.Fprintln(stdout, version.String("dunemgr"))
 	return nil
 }
 
