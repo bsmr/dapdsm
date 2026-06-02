@@ -13,7 +13,9 @@ const helpVerb = "help"
 // suggest returns the completion candidates for the current (last) token of line,
 // filtered by that token as a prefix. A trailing space means the current token is
 // an empty token at the next position. hosts supplies argHost candidates.
-func suggest(line string, hosts []string) []string {
+// selHost is the currently-selected host; cache is the live player-name pool
+// keyed by host name.
+func suggest(line string, hosts []string, selHost string, cache map[string][]string) []string {
 	tokens, cur := splitCurrent(line)
 	pos := len(tokens) // index of the current token
 	var pool []string
@@ -36,6 +38,10 @@ func suggest(line string, hosts []string) []string {
 		if spec.IsCatalogPos(argPos) && cur == "" {
 			return nil
 		}
+		// Player slots are served from the live cache, not the static candidates.
+		if spec.IsPlayerPos(argPos) {
+			return suggestPlayers(line, selHost, cache)
+		}
 		pool = spec.Candidates(argPos, hosts, tokens...)
 	}
 
@@ -48,11 +54,24 @@ func suggest(line string, hosts []string) []string {
 	return out
 }
 
+// suggestPlayers returns cached player names for selHost that prefix-match the
+// current token of line (empty token → all; the renderer caps display).
+func suggestPlayers(line, selHost string, cache map[string][]string) []string {
+	_, cur := splitCurrent(line)
+	var out []string
+	for _, n := range cache[selHost] {
+		if cur == "" || strings.HasPrefix(strings.ToLower(n), strings.ToLower(cur)) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 // complete returns line with the current token completed to the longest common
 // prefix of the candidates (a unique match is inserted in full + a trailing
 // space), plus the candidate list. No candidates → line unchanged.
-func complete(line string, hosts []string) (string, []string) {
-	cands := suggest(line, hosts)
+func complete(line string, hosts []string, selHost string, cache map[string][]string) (string, []string) {
+	cands := suggest(line, hosts, selHost, cache)
 	if len(cands) == 0 {
 		return line, cands
 	}

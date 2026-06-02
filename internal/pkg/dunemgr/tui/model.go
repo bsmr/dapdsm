@@ -15,12 +15,14 @@ import (
 	"context"
 	"strings"
 
+	spinner "github.com/charmbracelet/bubbles/spinner"
 	textinput "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
 )
 
 // mode is the input mode of the TUI.
@@ -68,6 +70,16 @@ type cmdResultMsg struct {
 	err error
 }
 
+// playerNamesMsg delivers a freshly fetched slice of character names for one host.
+type playerNamesMsg struct {
+	host  string
+	names []string
+}
+
+// refreshVerb is the TUI built-in that drops the player-name cache for the
+// selected host (handled in the model, not the dispatcher).
+const refreshVerb = "refresh"
+
 // focusPane identifies which top-level pane has focus for cosmetic highlighting.
 type focusPane int
 
@@ -95,6 +107,10 @@ type model struct {
 	outScroll int    // scroll offset into the output pane (lines)
 	history   []string
 	histIdx   int
+
+	running     bool                // true while a dispatched command is in-flight
+	spin        spinner.Model       // animated spinner shown while running
+	playerNames map[string][]string // per-host player-name cache for argPlayer completion
 }
 
 const maxEvents = 200
@@ -108,13 +124,17 @@ func newModel(ctx context.Context, c *core.Core) model {
 	ti := textinput.New()
 	ti.Prompt = ":"
 	ti.CharLimit = 512
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
 	m := model{
-		ctx:      ctx,
-		core:     c,
-		mode:     modeNav,
-		hosts:    listHostNames(c),
-		statuses: map[string]hostStatus{},
-		input:    ti,
+		ctx:         ctx,
+		core:        c,
+		mode:        modeNav,
+		hosts:       listHostNames(c),
+		statuses:    map[string]hostStatus{},
+		input:       ti,
+		spin:        sp,
+		playerNames: map[string][]string{},
 	}
 	return m
 }
@@ -122,12 +142,21 @@ func newModel(ctx context.Context, c *core.Core) model {
 // parseLine splits a command-bar line into argv on whitespace.
 func parseLine(line string) []string { return strings.Fields(line) }
 
+// selectedHost returns the currently-selected host name, or "" if none.
+func (m model) selectedHost() string {
+	if len(m.hosts) > 0 && m.selected >= 0 && m.selected < len(m.hosts) {
+		return m.hosts[m.selected]
+	}
+	return ""
+}
+
 // dispatch runs the command line against the shared core on a goroutine and
 // reports the captured output as a cmdResultMsg. It must be returned as a
 // tea.Cmd so Update never blocks on SSH.
 func (m model) dispatch(line string) tea.Cmd {
 	c := m.core
 	ctx := m.ctx
+	line = injectHost(line, m.selectedHost(), m.hosts)
 	return func() tea.Msg {
 		argv := parseLine(line)
 		if len(argv) == 0 {
@@ -137,6 +166,45 @@ func (m model) dispatch(line string) tea.Cmd {
 		err := command.Dispatch(ctx, c, argv, &buf, &buf)
 		return cmdResultMsg{out: buf.String(), err: err}
 	}
+}
+
+// fetchPlayerNames fetches character names for host via PlayerSearch and returns
+// the result as a playerNamesMsg. On error an empty msg is returned so the cache
+// entry simply stays absent (the operator can retry with :refresh).
+func (m model) fetchPlayerNames(host string) tea.Cmd {
+	c := m.core
+	ctx := m.ctx
+	return func() tea.Msg {
+		if c == nil {
+			return playerNamesMsg{host: host}
+		}
+		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		players, err := r.PlayerSearch(ctx, host, "%", 200)
+		if err != nil {
+			return playerNamesMsg{host: host}
+		}
+		names := make([]string, 0, len(players))
+		for _, p := range players {
+			if p.CharacterName != "" {
+				names = append(names, p.CharacterName)
+			}
+		}
+		return playerNamesMsg{host: host, names: names}
+	}
+}
+
+// currentSlotIsPlayer reports whether the in-progress token of line occupies
+// an argPlayer slot of its verb.
+func currentSlotIsPlayer(line string) bool {
+	tokens, _ := splitCurrent(line)
+	if len(tokens) == 0 {
+		return false
+	}
+	spec, ok := command.SpecFor(tokens[0])
+	if !ok {
+		return false
+	}
+	return spec.IsPlayerPos(len(tokens) - 1)
 }
 
 // listHostNames returns the list of host names from the store, or nil if c is nil.
@@ -175,9 +243,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Blur()
 				return m, nil
 			case tea.KeyTab:
-				completed, _ := complete(m.input.Value(), m.hosts)
+				completed, _ := complete(m.input.Value(), m.hosts, m.selectedHost(), m.playerNames)
 				m.input.SetValue(completed)
 				m.input.CursorEnd()
+				if h := m.selectedHost(); h != "" && currentSlotIsPlayer(m.input.Value()) {
+					if _, ok := m.playerNames[h]; !ok {
+						return m, m.fetchPlayerNames(h)
+					}
+				}
 				return m, nil
 			case tea.KeyUp:
 				if m.histIdx > 0 {
@@ -205,11 +278,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.SetValue("")
 				m.input.Blur()
 				m.mode = modeNav
-				if fields := strings.Fields(line); len(fields) > 0 && fields[0] == helpVerb {
-					m.output = renderHelp(fields[1:])
-					return m, nil
+				if fields := strings.Fields(line); len(fields) > 0 {
+					switch fields[0] {
+					case helpVerb:
+						m.output = renderHelp(fields[1:])
+						return m, nil
+					case refreshVerb:
+						h := m.selectedHost()
+						delete(m.playerNames, h)
+						if h != "" {
+							m.output = "completion cache refreshed for " + h
+						} else {
+							m.output = "completion cache refreshed"
+						}
+						return m, nil
+					}
 				}
-				return m, m.dispatch(line)
+				m.running = true
+				return m, tea.Batch(m.dispatch(line), m.spin.Tick)
 			}
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
@@ -252,6 +338,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ":":
 			m.mode = modeCmd
 			m.input.SetValue("")
+			if h := m.selectedHost(); h != "" {
+				m.input.Prompt = "[" + h + "] › "
+			} else {
+				m.input.Prompt = "› "
+			}
 			return m, m.input.Focus()
 		case "tab":
 			if m.focus == focusHosts {
@@ -261,14 +352,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+	case spinner.TickMsg:
+		if !m.running {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.spin, cmd = m.spin.Update(msg)
+		return m, cmd
 	case cmdResultMsg:
 		m.mode = modeNav
 		m.outScroll = 0
+		m.running = false
 		if msg.err != nil {
 			m.output = msg.out + "\nerror: " + msg.err.Error()
 		} else {
 			m.output = msg.out
 		}
+		return m, nil
+	case playerNamesMsg:
+		m.playerNames[msg.host] = msg.names
 		return m, nil
 	case pollMsg:
 		s := m.statuses[msg.host]
@@ -311,7 +413,7 @@ func (m model) View() string {
 	var bottom string
 	if m.mode == modeCmd {
 		bottom = m.input.View() + "\n"
-		if sugg := suggest(m.input.Value(), m.hosts); len(sugg) > 0 {
+		if sugg := suggest(m.input.Value(), m.hosts, m.selectedHost(), m.playerNames); len(sugg) > 0 {
 			bottom += styleErr.Render(renderSuggestions(sugg)) + "\n"
 		}
 		if hint := usageHint(m.input.Value()); hint != "" {
@@ -320,17 +422,27 @@ func (m model) View() string {
 	} else {
 		bottom = "[:] command  [tab] focus  [q] quit\n"
 	}
+	if m.running {
+		bottom += m.spin.View() + " running…\n"
+	}
 
 	if m.width == 0 {
 		// Fallback for tests and the very first frame before WindowSizeMsg.
 		return list + "\n" + eventLog + "\n" + detail + "\n" + outputPane + bottom
 	}
 
-	// Two-column top (hosts | events) over detail, composed with lipgloss.
-	half := m.width / 2
-	hostPane := lipgloss.NewStyle().Width(half).Render(list)
-	evPane := lipgloss.NewStyle().Width(m.width - half).Render(eventLog)
-	top := lipgloss.JoinHorizontal(lipgloss.Top, hostPane, evPane)
-	body := lipgloss.JoinVertical(lipgloss.Left, top, detail, outputPane)
-	return body + "\n" + bottom
+	// Bordered sidebar (hosts + recent events) left, content right, command block bottom.
+	sidebar := styleBox.Width(sidebarWidth).Render(list + "\n" + renderEvents(m.events, 6))
+	contentW := m.width - sidebarWidth - 6 // two borders + gap
+	if contentW < 20 {
+		contentW = 20
+	}
+	content := styleBox.Width(contentW).Render(detail + "\n" + outputPane)
+	top := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, content)
+	cmdW := m.width - 2
+	if cmdW < 20 {
+		cmdW = 20
+	}
+	cmdBlock := styleBox.Width(cmdW).Render(strings.TrimRight(bottom, "\n"))
+	return lipgloss.JoinVertical(lipgloss.Left, top, cmdBlock)
 }

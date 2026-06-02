@@ -75,10 +75,10 @@ func TestPlayerInspectNotFound(t *testing.T) {
 func TestPlayerInspectParsesComponents(t *testing.T) {
 	rr := &seqRunner{resp: []string{
 		"Stilgar|Offline|2026-06-01 21:40:55|2\n", // header
-		"45|320\n",                                 // totals
-		"0|40\n",                                   // breakdown
-		"item.blade|1|5\n",                         // top items
-		fixtureComponents + "\n",                   // components (single jsonb line)
+		"45|320\n",               // totals
+		"0|40\n",                 // breakdown
+		"item.blade|1|5\n",       // top items
+		fixtureComponents + "\n", // components (single jsonb line)
 	}}
 	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 	d, err := r.PlayerInspect(context.Background(), "h", "FLS1", 10, false)

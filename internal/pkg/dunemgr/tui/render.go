@@ -12,7 +12,11 @@ import (
 var (
 	styleSelected = lipgloss.NewStyle().Bold(true)
 	styleErr      = lipgloss.NewStyle().Faint(true)
+	styleBox      = lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
 )
+
+// sidebarWidth is the fixed column width of the host sidebar in the framed layout.
+const sidebarWidth = 22
 
 // renderHostList renders one row per host with a cursor on the selected index.
 func renderHostList(hosts []string, st map[string]hostStatus, selected int) string {

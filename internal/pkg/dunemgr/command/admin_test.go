@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -58,11 +59,12 @@ func TestAdminCmd_UnknownVerb(t *testing.T) {
 }
 
 // TestAdminCmd_DestructiveWithoutConfirm verifies that kick without --confirm
-// returns an error without attempting a publish.
+// returns an error without attempting a publish. Uses --id to skip name
+// resolution so the destructive-gate is what fails, not the resolver.
 func TestAdminCmd_DestructiveWithoutConfirm(t *testing.T) {
 	c := newCoreForAdmin(t)
 	var stdout, stderr bytes.Buffer
-	err := adminCmd(context.Background(), c, []string{"vm-a", "kick", "player-x"}, &stdout, &stderr)
+	err := adminCmd(context.Background(), c, []string{"vm-a", "kick", "player-x", "--id"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for kick without --confirm, got nil")
 	}
@@ -72,10 +74,11 @@ func TestAdminCmd_DestructiveWithoutConfirm(t *testing.T) {
 }
 
 // TestAdminCmd_CleanWithoutConfirm is a second destructive-gate test.
+// Uses --id to skip name resolution so the destructive-gate is what fails.
 func TestAdminCmd_CleanWithoutConfirm(t *testing.T) {
 	c := newCoreForAdmin(t)
 	var stdout, stderr bytes.Buffer
-	err := adminCmd(context.Background(), c, []string{"vm-a", "clean", "player-x"}, &stdout, &stderr)
+	err := adminCmd(context.Background(), c, []string{"vm-a", "clean", "player-x", "--id"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for clean without --confirm, got nil")
 	}
@@ -93,11 +96,12 @@ func TestAdminCmd_WildcardWithoutConfirm(t *testing.T) {
 }
 
 // TestAdminCmd_ItemMissingItemName verifies that "item" without a name errors
-// before any publish.
+// before any publish. Uses --id to skip name resolution so ItemName validation
+// is what fails.
 func TestAdminCmd_ItemMissingItemName(t *testing.T) {
 	c := newCoreForAdmin(t)
 	var stdout, stderr bytes.Buffer
-	err := adminCmd(context.Background(), c, []string{"vm-a", "item", "player-x"}, &stdout, &stderr)
+	err := adminCmd(context.Background(), c, []string{"vm-a", "item", "player-x", "--id"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for item without ItemName, got nil")
 	}
@@ -136,6 +140,19 @@ func TestAdminCmd_FlagParse_Item(t *testing.T) {
 	}
 	if fields["Quantity"] != "3" {
 		t.Errorf("Quantity = %q, want \"3\"", fields["Quantity"])
+	}
+}
+
+// TestAdminUnknownPlayerIsUsageError verifies that passing a player NAME (not a
+// raw FLS id or wildcard) resolves via the DB; if resolution fails (no host
+// reachable in tests) the error is wrapped as ErrUsage.
+func TestAdminUnknownPlayerIsUsageError(t *testing.T) {
+	c := newCoreForAdmin(t) // has ssh.NewClient(); discoverDB fails → ErrUsage
+	var out, errb bytes.Buffer
+	// "water NoSuchName" — non-destructive verb so no --confirm needed before resolution.
+	err := adminCmd(context.Background(), c, []string{"h", "water", "NoSuchName"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("unknown name should be ErrUsage, got %v", err)
 	}
 }
 

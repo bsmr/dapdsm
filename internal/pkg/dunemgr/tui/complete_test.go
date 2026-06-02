@@ -6,7 +6,7 @@ import (
 )
 
 func TestSuggestVerbsByPrefix(t *testing.T) {
-	got := suggest("b", nil)
+	got := suggest("b", nil, "", nil)
 	// "backup" and "broadcast" both start with b
 	if !contains(got, "backup") || !contains(got, "broadcast") {
 		t.Errorf("suggest(\"b\") = %v, want backup+broadcast", got)
@@ -15,21 +15,21 @@ func TestSuggestVerbsByPrefix(t *testing.T) {
 
 func TestSuggestHostPosition(t *testing.T) {
 	hosts := []string{"vm-a", "vm-b"}
-	got := suggest("lifecycle ", hosts) // trailing space → next token (host)
+	got := suggest("lifecycle ", hosts, "", nil) // trailing space → next token (host)
 	if !reflect.DeepEqual(got, []string{"vm-a", "vm-b"}) {
 		t.Errorf("suggest host pos = %v, want [vm-a vm-b]", got)
 	}
 }
 
 func TestSuggestSubVerbPosition(t *testing.T) {
-	got := suggest("lifecycle vm-a re", nil) // action token "re"
+	got := suggest("lifecycle vm-a re", nil, "", nil) // action token "re"
 	if !reflect.DeepEqual(got, []string{"restart"}) {
 		t.Errorf("suggest action = %v, want [restart]", got)
 	}
 }
 
 func TestCompleteUniqueInsertsValueAndSpace(t *testing.T) {
-	got, _ := complete("lifecycle vm-a re", nil)
+	got, _ := complete("lifecycle vm-a re", nil, "", nil)
 	if got != "lifecycle vm-a restart " {
 		t.Errorf("complete = %q, want \"lifecycle vm-a restart \"", got)
 	}
@@ -37,7 +37,7 @@ func TestCompleteUniqueInsertsValueAndSpace(t *testing.T) {
 
 func TestCompleteCommonPrefixOnAmbiguous(t *testing.T) {
 	// host verb sub-options add/list/rm/probe; "" → no common prefix beyond ""
-	got, cands := complete("host ", nil)
+	got, cands := complete("host ", nil, "", nil)
 	if got != "host " {
 		t.Errorf("ambiguous complete should not change line, got %q", got)
 	}
@@ -47,14 +47,14 @@ func TestCompleteCommonPrefixOnAmbiguous(t *testing.T) {
 }
 
 func TestCompleteFreeformNoCompletion(t *testing.T) {
-	got, cands := complete("db vm-a exec sel", nil) // exec's next slot is argFree (sql)
+	got, cands := complete("db vm-a exec sel", nil, "", nil) // exec's next slot is argFree (sql)
 	if got != "db vm-a exec sel" || len(cands) != 0 {
 		t.Errorf("freeform should not complete: line=%q cands=%v", got, cands)
 	}
 }
 
 func TestCompleteUnknownVerbNoCandidates(t *testing.T) {
-	_, cands := complete("frob ", nil)
+	_, cands := complete("frob ", nil, "", nil)
 	if len(cands) != 0 {
 		t.Errorf("unknown verb args → no candidates, got %v", cands)
 	}
@@ -64,7 +64,7 @@ func TestCompleteUnknownVerbNoCandidates(t *testing.T) {
 // returned for an empty token at the name position.
 func TestSuggestAdminCatalog_EmptyToken(t *testing.T) {
 	// "admin vm-a item player-x " — trailing space means next token is empty
-	got := suggest("admin vm-a item player-x ", nil)
+	got := suggest("admin vm-a item player-x ", nil, "", nil)
 	if got != nil {
 		t.Errorf("catalog slot with empty token: expected nil, got %d candidates", len(got))
 	}
@@ -74,7 +74,7 @@ func TestSuggestAdminCatalog_EmptyToken(t *testing.T) {
 // position returns only matching catalog ids.
 func TestSuggestAdminCatalog_PrefixFiltered(t *testing.T) {
 	// "admin vm-a item player-x T6_Augment_Ac" should match T6_Augment_Acuracy1
-	got := suggest("admin vm-a item player-x T6_Augment_Ac", nil)
+	got := suggest("admin vm-a item player-x T6_Augment_Ac", nil, "", nil)
 	if len(got) == 0 {
 		t.Fatal("catalog suggest with prefix T6_Augment_Ac: got no candidates")
 	}
@@ -93,7 +93,7 @@ func TestSuggestAdminCatalog_PrefixFiltered(t *testing.T) {
 // unique catalog prefix inserts the full value and a trailing space.
 // "Skills.Ability.Hypersp" is a unique prefix for "Skills.Ability.Hypersprint".
 func TestCompleteAdminCatalog_PrefixComplete(t *testing.T) {
-	line, cands := complete("admin vm-a skill player-x Skills.Ability.Hypersp", nil)
+	line, cands := complete("admin vm-a skill player-x Skills.Ability.Hypersp", nil, "", nil)
 	if len(cands) == 0 {
 		t.Fatal("complete on unique skill prefix: no candidates")
 	}
@@ -113,7 +113,7 @@ func TestCompleteAdminCatalog_PrefixComplete(t *testing.T) {
 // TestSuggestAdminCatalog_SkillVerb verifies that the skill catalog is used
 // when the admin sub-verb is "skill".
 func TestSuggestAdminCatalog_SkillVerb(t *testing.T) {
-	got := suggest("admin vm-a skill player-x Skills.Ability.H", nil)
+	got := suggest("admin vm-a skill player-x Skills.Ability.H", nil, "", nil)
 	if len(got) == 0 {
 		t.Fatal("skill catalog suggest: got no candidates")
 	}
@@ -123,6 +123,25 @@ func TestSuggestAdminCatalog_SkillVerb(t *testing.T) {
 			// item ids start with 'T' (e.g. T6_...), skill ids start with 'Skills.'
 			t.Errorf("skill catalog returned non-skill id: %q", c)
 		}
+	}
+}
+
+// TestSuggestPlayerUsesCache verifies prefix filtering against the name cache.
+func TestSuggestPlayerUsesCache(t *testing.T) {
+	cache := map[string][]string{"vm-a": {"Stilgar", "Stilburn", "Muad'Dib"}}
+	got := suggest("whisper vm-a Stil", []string{"vm-a"}, "vm-a", cache)
+	if len(got) != 2 || got[0] != "Stilgar" {
+		t.Fatalf("player suggest = %v", got)
+	}
+}
+
+// TestSuggestPlayerEmptyTokenListsAll verifies that an empty token lists all
+// cached names (no suppression for argPlayer, unlike argCatalog).
+func TestSuggestPlayerEmptyTokenListsAll(t *testing.T) {
+	cache := map[string][]string{"vm-a": {"A", "B", "C"}}
+	got := suggest("whisper vm-a ", []string{"vm-a"}, "vm-a", cache)
+	if len(got) != 3 {
+		t.Fatalf("empty token should list all players, got %v", got)
 	}
 }
 

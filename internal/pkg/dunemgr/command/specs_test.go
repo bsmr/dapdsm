@@ -107,3 +107,47 @@ func TestAvatarUsageString(t *testing.T) {
 		t.Fatalf("usage missing verb: %q", got)
 	}
 }
+
+// TestIsPlayerPos verifies that IsPlayerPos returns true for the whisper
+// player slot and false for host, fixed, catalog, and free slots.
+func TestIsPlayerPos(t *testing.T) {
+	w, ok := SpecFor("whisper")
+	if !ok {
+		t.Fatal("no whisper spec")
+	}
+	// pos 0: host — not a player slot
+	if w.IsPlayerPos(0) {
+		t.Error("whisper pos0 (host) should not be a player slot")
+	}
+	// pos 1: player — must be argPlayer
+	if !w.IsPlayerPos(1) {
+		t.Error("whisper pos1 should be an argPlayer slot")
+	}
+	// pos 2: message (argFree) — not a player slot
+	if w.IsPlayerPos(2) {
+		t.Error("whisper pos2 (message) should not be a player slot")
+	}
+	// out of range
+	if w.IsPlayerPos(-1) || w.IsPlayerPos(99) {
+		t.Error("out-of-range pos should not be a player slot")
+	}
+}
+
+// TestArgPlayerCandidatesNil verifies that the command package returns nil
+// for argPlayer slots (the TUI supplies names from its live cache).
+func TestArgPlayerCandidatesNil(t *testing.T) {
+	w, _ := SpecFor("whisper")
+	if got := w.Candidates(1, nil); got != nil {
+		t.Errorf("argPlayer Candidates should be nil, got %v", got)
+	}
+}
+
+// TestArgPlayerUsageRendered verifies that Usage() renders argPlayer as
+// "<player>" (same style as argFree).
+func TestArgPlayerUsageRendered(t *testing.T) {
+	w, _ := SpecFor("whisper")
+	got := w.Usage()
+	if !strings.Contains(got, "<player>") {
+		t.Errorf("whisper Usage() should contain <player>, got %q", got)
+	}
+}

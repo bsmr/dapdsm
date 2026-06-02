@@ -14,10 +14,10 @@ import (
 )
 
 const avatarUsage = `usage:
-  dunemgr avatar export   <host> <fls-id>
+  dunemgr avatar export   <host> <name|fls> [--id]
   dunemgr avatar list     <host>
-  dunemgr avatar import   <host> <fls-id> <export-key> [--name <name>] --confirm
-  dunemgr avatar transfer <src-host> <dst-host> <fls-id> [--name <name>] [--check] --confirm`
+  dunemgr avatar import   <host> <name|fls> <export-key> [--name <name>] [--id] --confirm
+  dunemgr avatar transfer <src-host> <dst-host> <name|fls> [--name <name>] [--check] [--id] --confirm`
 
 func avatarCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 1 {
@@ -31,25 +31,32 @@ func avatarCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 	}
 	switch args[0] {
 	case "export":
-		return avatarExport(ctx, r, args[1:], stdout, stderr)
+		return avatarExport(ctx, c, r, args[1:], stdout, stderr)
 	case "list":
 		return avatarList(r, args[1:], stdout, stderr)
 	case "import":
-		return avatarImport(ctx, r, args[1:], stdout, stderr)
+		return avatarImport(ctx, c, r, args[1:], stdout, stderr)
 	case "transfer":
-		return avatarTransfer(ctx, r, args[1:], stdout, stderr)
+		return avatarTransfer(ctx, c, r, args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown avatar subcommand %q (want export|list|import|transfer)\n", args[0])
 		return fmt.Errorf("avatar: unknown sub %q: %w", args[0], ErrUsage)
 	}
 }
 
-func avatarExport(ctx context.Context, r *avatar.Runner, args []string, stdout, stderr io.Writer) error {
+func avatarExport(ctx context.Context, c *core.Core, r *avatar.Runner, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
-		fmt.Fprintln(stderr, "usage: dunemgr avatar export <host> <fls-id>")
+		fmt.Fprintln(stderr, "usage: dunemgr avatar export <host> <name|fls> [--id]")
 		return fmt.Errorf("avatar export: usage: %w", ErrUsage)
 	}
-	rec, err := r.Export(ctx, "cli", args[0], args[1])
+	host := args[0]
+	useID := hasFlag(args[2:], "--id")
+	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	fls, err := resolvePlayerArg(ctx, dbr, host, args[1], useID, stderr)
+	if err != nil {
+		return err
+	}
+	rec, err := r.Export(ctx, "cli", host, fls)
 	if err != nil {
 		return err
 	}
@@ -78,39 +85,52 @@ func avatarList(r *avatar.Runner, args []string, stdout, stderr io.Writer) error
 	return nil
 }
 
-func avatarImport(ctx context.Context, r *avatar.Runner, args []string, stdout, stderr io.Writer) error {
+func avatarImport(ctx context.Context, c *core.Core, r *avatar.Runner, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 3 {
-		fmt.Fprintln(stderr, "usage: dunemgr avatar import <host> <fls-id> <export-key> [--name <name>] --confirm")
+		fmt.Fprintln(stderr, "usage: dunemgr avatar import <host> <name|fls> <export-key> [--name <name>] [--id] --confirm")
 		return fmt.Errorf("avatar import: usage: %w", ErrUsage)
 	}
-	host, fls, key := args[0], args[1], args[2]
+	host, flsRef, key := args[0], args[1], args[2]
 	fs := flag.NewFlagSet("import", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	name := fs.String("name", "", "character name (defaults to the export record's stored name)")
 	confirm := fs.Bool("confirm", false, "explicitly confirm the destructive import")
+	useID := fs.Bool("id", false, "treat <player> as a raw FLS id, skip name resolution")
 	if err := fs.Parse(args[3:]); err != nil {
 		return err
 	}
-	id, err := r.Import(ctx, "cli", host, fls, key, *name, *confirm)
+	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	fls, err := resolvePlayerArg(ctx, dbr, host, flsRef, *useID, stderr)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "import ok\ncontroller_id=%d\n", id)
+	ctrlID, err := r.Import(ctx, "cli", host, fls, key, *name, *confirm)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "import ok\ncontroller_id=%d\n", ctrlID)
 	return nil
 }
 
-func avatarTransfer(ctx context.Context, r *avatar.Runner, args []string, stdout, stderr io.Writer) error {
+func avatarTransfer(ctx context.Context, c *core.Core, r *avatar.Runner, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 3 {
-		fmt.Fprintln(stderr, "usage: dunemgr avatar transfer <src-host> <dst-host> <fls-id> [--name <name>] [--check] --confirm")
+		fmt.Fprintln(stderr, "usage: dunemgr avatar transfer <src-host> <dst-host> <name|fls> [--name <name>] [--check] [--id] --confirm")
 		return fmt.Errorf("avatar transfer: usage: %w", ErrUsage)
 	}
-	src, dst, fls := args[0], args[1], args[2]
+	src, dst, flsRef := args[0], args[1], args[2]
 	fs := flag.NewFlagSet("transfer", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	name := fs.String("name", "", "character name (defaults to the source player's name)")
 	check := fs.Bool("check", false, "dry-run: run pre-flight gates only, change nothing")
 	confirm := fs.Bool("confirm", false, "explicitly confirm the destructive transfer")
+	useID := fs.Bool("id", false, "treat <player> as a raw FLS id, skip name resolution")
 	if err := fs.Parse(args[3:]); err != nil {
+		return err
+	}
+	// Resolve against the source host — that's where the player must exist.
+	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	fls, err := resolvePlayerArg(ctx, dbr, src, flsRef, *useID, stderr)
+	if err != nil {
 		return err
 	}
 	res, err := r.Transfer(ctx, "cli", src, dst, fls, *name, *check, *confirm)

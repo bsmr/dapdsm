@@ -17,8 +17,8 @@ import (
 func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
 		fmt.Fprintln(stderr, "usage: dunemgr player <host> search <query> [--limit N]")
-		fmt.Fprintln(stderr, "       dunemgr player <host> pos <fls-id>")
-		fmt.Fprintln(stderr, "       dunemgr player <host> inspect <fls-id> [--top N] [--raw]")
+		fmt.Fprintln(stderr, "       dunemgr player <host> pos <name|fls> [--id]")
+		fmt.Fprintln(stderr, "       dunemgr player <host> inspect <name|fls> [--top N] [--raw] [--id]")
 		return fmt.Errorf("player: usage: %w", ErrUsage)
 	}
 	host, sub, rest := args[0], args[1], args[2:]
@@ -38,10 +38,13 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 		return nil
 	case "pos":
 		if len(rest) < 1 {
-			fmt.Fprintln(stderr, "usage: dunemgr player <host> pos <fls-id>")
+			fmt.Fprintln(stderr, "usage: dunemgr player <host> pos <name|fls> [--id]")
 			return fmt.Errorf("player pos: usage: %w", ErrUsage)
 		}
-		flsID := rest[0]
+		flsID, err := resolvePlayerArg(ctx, r, host, rest[0], hasFlag(rest[1:], "--id"), stderr)
+		if err != nil {
+			return err
+		}
 		pos, err := r.PlayerPosition(ctx, host, flsID)
 		if err != nil {
 			return err
@@ -54,16 +57,19 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 		return nil
 	case "inspect":
 		if len(rest) < 1 {
-			fmt.Fprintln(stderr, "usage: dunemgr player <host> inspect <fls-id> [--top N] [--raw]")
+			fmt.Fprintln(stderr, "usage: dunemgr player <host> inspect <name|fls> [--top N] [--raw] [--id]")
 			return fmt.Errorf("player inspect: usage: %w", ErrUsage)
 		}
-		flsID := rest[0]
+		ref := rest[0]
 		top := 10
 		raw := false
+		useID := false
 		for i := 1; i < len(rest); i++ {
 			switch rest[i] {
 			case "--raw":
 				raw = true
+			case "--id":
+				useID = true
 			case "--top":
 				if i+1 < len(rest) {
 					if n, e := strconv.Atoi(rest[i+1]); e == nil {
@@ -72,6 +78,10 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 					i++
 				}
 			}
+		}
+		flsID, err := resolvePlayerArg(ctx, r, host, ref, useID, stderr)
+		if err != nil {
+			return err
 		}
 		d, err := r.PlayerInspect(ctx, host, flsID, top, raw)
 		if err != nil {
