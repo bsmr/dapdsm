@@ -15,7 +15,9 @@ import (
 
 const giveUsage = `usage: dunemgr give <host> currency <name|fls> <currency-id> <delta> [--check] [--force] [--id]
        dunemgr give <host> item <name|fls> <item-name> <count> [--quality N] [--durability F] [--check] [--id]
-       dunemgr give <host> skillpoints <name|fls> <amount> [--check] [--force] [--id]`
+       dunemgr give <host> skillpoints <name|fls> <amount> [--check] [--force] [--id]
+       dunemgr give <host> xp <name|fls> <amount> --track <Combat|Melee|Mentat|Trooper|Swordmaster|Planetologist|BeneGesserit|Vehicle> [--check] [--id]
+       dunemgr give <host> charxp <name|fls> <amount> [--check] [--force] [--id]`
 
 func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
@@ -36,6 +38,7 @@ func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io
 	quality := fs.Int64("quality", 0, "item quality (DB/offline path only)")
 	durability := fs.Float64("durability", 1.0, "item durability (MQ/online path only)")
 	id := fs.Bool("id", false, "treat <player> as a raw FLS id, skip name resolution")
+	track := fs.String("track", "", "specialization track for `give xp` (required)")
 
 	var req grant.Req
 	req.FLS = giveFirst(rest)
@@ -84,8 +87,42 @@ func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io
 		if err := fs.Parse(rest[2:]); err != nil {
 			return err
 		}
+	case "xp":
+		if len(rest) < 2 {
+			fmt.Fprintln(stderr, giveUsage)
+			return fmt.Errorf("give xp: usage: %w", ErrUsage)
+		}
+		amount, err := strconv.ParseInt(rest[1], 10, 64)
+		if err != nil {
+			fmt.Fprintln(stderr, "give xp: <amount> must be an integer")
+			return fmt.Errorf("give xp: parse: %w", ErrUsage)
+		}
+		req.Verb, req.XP = grant.VerbXP, amount
+		if err := fs.Parse(rest[2:]); err != nil {
+			return err
+		}
+		canon, ok := grant.CanonicalTrack(*track)
+		if !ok {
+			fmt.Fprintf(stderr, "give xp: --track required, one of %v\n", grant.Tracks())
+			return fmt.Errorf("give xp: track: %w", ErrUsage)
+		}
+		req.Track = canon
+	case "charxp":
+		if len(rest) < 2 {
+			fmt.Fprintln(stderr, giveUsage)
+			return fmt.Errorf("give charxp: usage: %w", ErrUsage)
+		}
+		amount, err := strconv.ParseInt(rest[1], 10, 64)
+		if err != nil {
+			fmt.Fprintln(stderr, "give charxp: <amount> must be an integer")
+			return fmt.Errorf("give charxp: parse: %w", ErrUsage)
+		}
+		req.Verb, req.XP = grant.VerbCharXP, amount
+		if err := fs.Parse(rest[2:]); err != nil {
+			return err
+		}
 	default:
-		fmt.Fprintf(stderr, "unknown give subcommand %q (want currency|item|skillpoints)\n", sub)
+		fmt.Fprintf(stderr, "unknown give subcommand %q (want currency|item|skillpoints|xp|charxp)\n", sub)
 		return fmt.Errorf("give: unknown sub %q: %w", sub, ErrUsage)
 	}
 	req.Force = *force
