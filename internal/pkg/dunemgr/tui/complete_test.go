@@ -3,6 +3,8 @@ package tui
 import (
 	"reflect"
 	"testing"
+
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
 )
 
 func TestSuggestVerbsByPrefix(t *testing.T) {
@@ -142,6 +144,42 @@ func TestSuggestPlayerEmptyTokenListsAll(t *testing.T) {
 	got := suggest("whisper vm-a ", []string{"vm-a"}, "vm-a", cache)
 	if len(got) != 3 {
 		t.Fatalf("empty token should list all players, got %v", got)
+	}
+}
+
+func TestEffectiveArgPosShiftsForImpliedHost(t *testing.T) {
+	hosts := []string{"vm-a", "vm-b"}
+	wspec, _ := command.SpecFor("whisper")
+	if got := effectiveArgPos(wspec, []string{"whisper"}, hosts); got != 1 {
+		t.Fatalf("implied host: argPos=%d want 1", got)
+	}
+	if got := effectiveArgPos(wspec, []string{"whisper", "vm-a"}, hosts); got != 1 {
+		t.Fatalf("explicit host: argPos=%d want 1", got)
+	}
+	hspec, _ := command.SpecFor("host")
+	if got := effectiveArgPos(hspec, []string{"host"}, hosts); got != 0 {
+		t.Fatalf("non-host verb: argPos=%d want 0", got)
+	}
+}
+
+func TestSuggestPlayerWithImpliedHost(t *testing.T) {
+	cache := map[string][]string{"vm-a": {"Stilgar", "Stilburn", "Muad'Dib"}}
+	got := suggest("whisper Sti", []string{"vm-a"}, "vm-a", cache)
+	if len(got) != 2 || got[0] != "Stilgar" {
+		t.Fatalf("implied-host player suggest = %v", got)
+	}
+	all := suggest("whisper ", []string{"vm-a"}, "vm-a", cache)
+	if len(all) != 3 {
+		t.Fatalf("implied-host empty token = %v", all)
+	}
+}
+
+func TestCompleteImpliedHostKeepsHostOutOfLine(t *testing.T) {
+	cache := map[string][]string{"vm-a": {"Stilgar"}}
+	line, _ := complete("whisper Sti", []string{"vm-a"}, "vm-a", cache)
+	// unique match adds a trailing space; the host must NOT appear in the line
+	if line != "whisper Stilgar " {
+		t.Fatalf("complete must rebuild the RAW line (no host): %q", line)
 	}
 }
 

@@ -194,8 +194,11 @@ func (m model) fetchPlayerNames(host string) tea.Cmd {
 }
 
 // currentSlotIsPlayer reports whether the in-progress token of line occupies
-// an argPlayer slot of its verb.
-func currentSlotIsPlayer(line string) bool {
+// an argPlayer slot of its verb, accounting for an implied host. hosts is the
+// full configured host list; a non-empty slice activates the implied-host
+// shift (effectiveArgPos). The caller must separately ensure a host is
+// actually selected before acting on the result.
+func currentSlotIsPlayer(line string, hosts []string) bool {
 	tokens, _ := splitCurrent(line)
 	if len(tokens) == 0 {
 		return false
@@ -204,7 +207,7 @@ func currentSlotIsPlayer(line string) bool {
 	if !ok {
 		return false
 	}
-	return spec.IsPlayerPos(len(tokens) - 1)
+	return spec.IsPlayerPos(effectiveArgPos(spec, tokens, hosts))
 }
 
 // listHostNames returns the list of host names from the store, or nil if c is nil.
@@ -246,7 +249,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				completed, _ := complete(m.input.Value(), m.hosts, m.selectedHost(), m.playerNames)
 				m.input.SetValue(completed)
 				m.input.CursorEnd()
-				if h := m.selectedHost(); h != "" && currentSlotIsPlayer(m.input.Value()) {
+				if h := m.selectedHost(); h != "" && currentSlotIsPlayer(m.input.Value(), m.hosts) {
 					if _, ok := m.playerNames[h]; !ok {
 						return m, m.fetchPlayerNames(h)
 					}
