@@ -16,7 +16,7 @@ import (
 // BattleGroup database on the named host via SSH + kubectl exec.
 func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
-		fmt.Fprintln(stderr, "usage: dunemgr player <host> search <query> [--limit N]")
+		fmt.Fprintln(stderr, "usage: dunemgr player <host> search [<query>] [--limit N]   (empty query lists all)")
 		fmt.Fprintln(stderr, "       dunemgr player <host> pos <name|fls> [--id]")
 		fmt.Fprintln(stderr, "       dunemgr player <host> inspect <name|fls> [--top N] [--raw] [--id]")
 		return fmt.Errorf("player: usage: %w", ErrUsage)
@@ -25,11 +25,7 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 	r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
 	switch sub {
 	case "search":
-		if len(rest) < 1 {
-			fmt.Fprintln(stderr, "usage: dunemgr player <host> search <query> [--limit N]")
-			return fmt.Errorf("player search: usage: %w", ErrUsage)
-		}
-		query, limit := parseSearchArgs(rest)
+		query, limit := parseSearchArgs(rest) // empty query → PlayerSearch lists all (%)
 		players, err := r.PlayerSearch(ctx, host, query, limit)
 		if err != nil {
 			return err

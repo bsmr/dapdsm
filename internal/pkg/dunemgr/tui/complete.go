@@ -32,7 +32,14 @@ func suggest(line string, hosts []string, selHost string, cache map[string][]str
 		// the candidate strings (nil for freeform / out-of-range).
 		// Pass the already-typed tokens so argCatalog slots can select the
 		// right catalog based on the admin sub-verb.
-		argPos := pos - 1
+		// Pass hosts only when a host is selected; nil disables the
+		// implied-host shift so explicit-host-slot suggestions still appear
+		// when no host is selected.
+		impliedHosts := hosts
+		if selHost == "" {
+			impliedHosts = nil
+		}
+		argPos := effectiveArgPos(spec, tokens, impliedHosts)
 		// Suppress catalog suggestions on empty token: the catalog can have
 		// thousands of entries, which would flood the suggestion line.
 		if spec.IsCatalogPos(argPos) && cur == "" {
@@ -119,6 +126,28 @@ func usageHint(line string) string {
 		return s.Usage()
 	}
 	return ""
+}
+
+// effectiveArgPos returns the spec arg index for the in-progress token,
+// accounting for an implied selected host. tokens are the COMPLETED tokens
+// (verb + finished args, excluding the in-progress token). For an
+// argHost-first verb with a non-nil hosts slice but no explicit host typed
+// by the operator, the implied host occupies slot 0, so the operator's
+// typed args shift one slot right — making e.g. whisper's argPlayer slot
+// reachable as `whisper <name>`. Callers pass nil for hosts when no host
+// selection is active (disabling the shift).
+func effectiveArgPos(spec command.Spec, tokens []string, hosts []string) int {
+	argPos := len(tokens) - 1
+	if len(hosts) > 0 && spec.FirstArgIsHost() && !explicitHostTyped(tokens, hosts) {
+		argPos++
+	}
+	return argPos
+}
+
+// explicitHostTyped reports whether a known host alias was already typed as
+// the verb's first argument (tokens[1]).
+func explicitHostTyped(tokens []string, hosts []string) bool {
+	return len(tokens) >= 2 && isKnownHost(tokens[1], hosts)
 }
 
 func longestCommonPrefix(ss []string) string {

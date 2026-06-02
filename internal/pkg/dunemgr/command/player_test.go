@@ -45,21 +45,6 @@ func TestPlayerUnknownSubVerb(t *testing.T) {
 	}
 }
 
-func TestPlayerSearchRequiresQuery(t *testing.T) {
-	st, err := store.Open(filepath.Join(t.TempDir(), "state.bolt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
-	c := &core.Core{Store: st, SSH: ssh.NewClient()}
-	var stdout, stderr bytes.Buffer
-	// "search" without a query arg → usage error (we require at least the query).
-	// Note: we do accept empty string to mean "all", so this tests truly missing arg.
-	if err := playerCmd(context.Background(), c, []string{"vm-a", "search"}, &stdout, &stderr); err == nil {
-		t.Error("player search no query: err=nil, want non-nil")
-	}
-}
-
 func TestPlayerPosRequiresFLSID(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "state.bolt"))
 	if err != nil {
@@ -100,6 +85,41 @@ func TestPlayerSpecHasInspect(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("player spec sub-verbs missing inspect: %v", s.Args[1].options)
+	}
+}
+
+// searchSeqRunner: Run answers the DB-deployment discovery; RunWithStdin returns
+// canned responses in order (PlayerSearch: #1 level-column probe, #2 the search).
+type searchSeqRunner struct {
+	resp []string
+	n    int
+}
+
+func (r *searchSeqRunner) Run(ctx context.Context, name string, args ...string) (ssh.Result, error) {
+	return ssh.Result{Stdout: "funcom-x dunedb 15432 postgres", ExitCode: 0}, nil
+}
+func (r *searchSeqRunner) RunWithStdin(ctx context.Context, stdin []byte, name string, args ...string) (ssh.Result, error) {
+	out := ""
+	if r.n < len(r.resp) {
+		out = r.resp[r.n]
+	}
+	r.n++
+	return ssh.Result{Stdout: out, ExitCode: 0}, nil
+}
+
+func TestPlayerSearchNoQueryListsAll(t *testing.T) {
+	rr := &searchSeqRunner{resp: []string{
+		"account_id\ncharacter_name\nplayer_pawn_id\n",      // PlayerSearch level-column probe
+		"A1|Stilgar|Offline|t1||1\nA2|Chani|Online|t2||1\n", // all players
+	}}
+	c := &core.Core{SSH: &ssh.Client{Runner: rr}, Store: openTestStore(t)}
+	var out, errb bytes.Buffer
+	err := Dispatch(context.Background(), c, []string{"player", "h", "search"}, &out, &errb)
+	if err != nil {
+		t.Fatalf("search with no query should succeed, got %v (%s)", err, errb.String())
+	}
+	if !strings.Contains(out.String(), "Stilgar") || !strings.Contains(out.String(), "Chani") {
+		t.Fatalf("expected all players listed:\n%s", out.String())
 	}
 }
 
