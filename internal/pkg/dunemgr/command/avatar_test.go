@@ -9,6 +9,7 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
+	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
 
 func openTestStore(t *testing.T) *store.Store {
@@ -44,10 +45,21 @@ func TestAvatarUsageErrors(t *testing.T) {
 	}
 }
 
+func TestAvatarUnknownPlayerIsUsageError(t *testing.T) {
+	var out, errb bytes.Buffer
+	// SSH present so discoverDB runs and fails (no such host) → resolvePlayerArg wraps as ErrUsage.
+	c := &core.Core{Store: openTestStore(t), SSH: ssh.NewClient()}
+	err := avatarCmd(context.Background(), c, []string{"export", "h", "NoSuchName"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("unknown name should be ErrUsage, got %v", err)
+	}
+}
+
 func TestAvatarImportRefusesWithoutConfirm(t *testing.T) {
 	var out, errb bytes.Buffer
-	c := &core.Core{Store: openTestStore(t)}
-	err := avatarCmd(context.Background(), c, []string{"import", "h", "fls", "key"}, &out, &errb)
+	// --id bypasses name resolution (SSH nil) so the --confirm gate is what fails.
+	c := &core.Core{Store: openTestStore(t), SSH: ssh.NewClient()}
+	err := avatarCmd(context.Background(), c, []string{"import", "h", "fls", "key", "--id"}, &out, &errb)
 	if err == nil {
 		t.Fatal("import without --confirm must error")
 	}

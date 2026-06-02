@@ -64,7 +64,7 @@ func TestCommandBarSession(t *testing.T) {
 	if m.input.Value() != "lifec" {
 		t.Fatalf("input = %q, want \"lifec\"", m.input.Value())
 	}
-	wantView("3 suggest", ":lifec", "lifecycle") // prompt + live suggestion
+	wantView("3 suggest", "lifec", "lifecycle") // prompt contains typed text + live suggestion
 
 	// Step 4: Tab completes the verb (unique → full value + trailing space).
 	apply(tea.KeyMsg{Type: tea.KeyTab})
@@ -118,7 +118,7 @@ func TestCommandBarSession(t *testing.T) {
 		t.Fatalf("step 8: ':' did not enter command mode")
 	}
 	keys("player vm-a search ")
-	wantView("8 player-search", ":player vm-a search")
+	wantView("8 player-search", "player vm-a search")
 
 	// Step 9: ':admin <host> item <player> <prefix>' + Tab offers catalog item ids.
 	// Reset the command bar, then type an admin item command prefix.

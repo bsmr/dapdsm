@@ -7,7 +7,18 @@ import (
 	"testing"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
+
+func TestWhisperUnknownPlayerIsUsageError(t *testing.T) {
+	var out, errb bytes.Buffer
+	// SSH present so discoverDB runs and fails (no such host) → resolvePlayerArg wraps as ErrUsage.
+	c := &core.Core{Store: openTestStore(t), SSH: ssh.NewClient()}
+	err := whisperCmd(context.Background(), c, []string{"h", "NoSuchName", "hi"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("unknown name should be ErrUsage, got %v", err)
+	}
+}
 
 func TestWhisperKnownAndUsage(t *testing.T) {
 	if !Known("whisper") {

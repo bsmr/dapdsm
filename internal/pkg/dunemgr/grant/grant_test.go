@@ -8,8 +8,8 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
+	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
 
 // recorder is a fake ssh.Runner. Run answers the DatabaseDeployment discovery

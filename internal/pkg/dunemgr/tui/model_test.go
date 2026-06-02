@@ -198,3 +198,78 @@ func TestOutputScrollOffsetClamps(t *testing.T) {
 		t.Fatalf("PgDown should clamp at maxScroll=90, got %d", mm.outScroll)
 	}
 }
+
+func TestRunningSetOnDispatchClearedOnResult(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.mode = modeCmd
+	m.input.SetValue("host list")
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m2.(model).running {
+		t.Fatal("dispatch should set running=true")
+	}
+	m3, _ := m2.(model).Update(cmdResultMsg{out: "ok"})
+	if m3.(model).running {
+		t.Fatal("a result should clear running")
+	}
+}
+
+func TestHelpDoesNotSetRunning(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.mode = modeCmd
+	m.input.SetValue("help")
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m2.(model).running {
+		t.Fatal("the help builtin must not set running")
+	}
+}
+
+// TestRefreshClearsPlayerCache verifies that ":refresh" drops the per-host
+// name cache and does NOT dispatch (cmd must be nil, running stays false).
+func TestRefreshClearsPlayerCache(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.hosts = []string{"vm-a"}
+	m.playerNames = map[string][]string{"vm-a": {"Stilgar"}}
+	m.mode = modeCmd
+	m.input.SetValue("refresh")
+	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if _, ok := m2.(model).playerNames["vm-a"]; ok {
+		t.Fatal(":refresh should drop the cache for the selected host")
+	}
+	if cmd != nil {
+		t.Fatal(":refresh must not dispatch (cmd should be nil)")
+	}
+	if m2.(model).running {
+		t.Fatal(":refresh must not set running")
+	}
+}
+
+// TestPlayerNamesMsgStored verifies that a playerNamesMsg is folded into the
+// model's playerNames map.
+func TestPlayerNamesMsgStored(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m2, _ := m.Update(playerNamesMsg{host: "vm-a", names: []string{"Stilgar"}})
+	if got := m2.(model).playerNames["vm-a"]; len(got) != 1 || got[0] != "Stilgar" {
+		t.Fatalf("playerNamesMsg not stored: %v", got)
+	}
+}
+
+func TestViewHasBorders(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.width, m.height = 100, 30
+	m.hosts = []string{"vm-a"}
+	m.statuses = map[string]hostStatus{"vm-a": {bgState: "Running", ready: 2, total: 2, reachable: true}}
+	out := m.View()
+	if !strings.Contains(out, "│") || !strings.Contains(out, "─") {
+		t.Fatalf("expected lipgloss borders in the framed layout:\n%s", out)
+	}
+}
+
+func TestViewZeroWidthFallbackUnchanged(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.hosts = []string{"vm-a"}
+	m.statuses = map[string]hostStatus{"vm-a": {bgState: "Running", ready: 2, total: 2}}
+	out := m.View() // width==0 → plain fallback, no borders required
+	if strings.Contains(out, "┌") {
+		t.Fatalf("zero-width fallback should stay unbordered:\n%s", out)
+	}
+}

@@ -10,6 +10,7 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
 )
 
@@ -17,7 +18,7 @@ import (
 //
 // Usage:
 //
-//	dunemgr admin <host> <verb> <player-id|*> [positional name] [flags]
+//	dunemgr admin <host> <verb> <name|fls|*> [positional name] [flags] [--id]
 //
 // All available verbs are listed in admin.Verbs(). Destructive verbs (kick,
 // clean, reset) and wildcard player "*" require --confirm.
@@ -34,9 +35,22 @@ func adminCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr i
 		return fmt.Errorf("admin: unknown verb %q: %w", verb, ErrUsage)
 	}
 
-	fields, confirm, err := parseAdminFlags(verb, rest, stderr)
+	// Extract --id before parseAdminFlags so it is not rejected as unknown.
+	useID := hasFlag(rest, "--id")
+	verbRest := stripFlag(rest, "--id")
+
+	fields, confirm, err := parseAdminFlags(verb, verbRest, stderr)
 	if err != nil {
 		return err
+	}
+
+	// Resolve the player reference unless it is the wildcard "*" or --id is set.
+	if playerID != "*" {
+		dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		playerID, err = resolvePlayerArg(ctx, dbr, host, playerID, useID, stderr)
+		if err != nil {
+			return err
+		}
 	}
 
 	r := &admin.Runner{MQ: &mq.Publisher{SSH: c.SSH, Store: c.Store}}
@@ -215,5 +229,5 @@ func popPositional(args []string) (string, []string) {
 // printAdminUsage writes the usage hint for the admin verb.
 func printAdminUsage(w io.Writer) {
 	verbs := strings.Join(admin.Verbs(), "|")
-	fmt.Fprintf(w, "usage: dunemgr admin <host> <%s> <player-id|*> [args] [--confirm]\n", verbs)
+	fmt.Fprintf(w, "usage: dunemgr admin <host> <%s> <name|fls|*> [args] [--id] [--confirm]\n", verbs)
 }

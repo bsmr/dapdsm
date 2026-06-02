@@ -19,7 +19,7 @@ import (
 // message text in the audit log.
 func whisperCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 3 {
-		fmt.Fprintln(stderr, "usage: dunemgr whisper <host> <fls-id> <message> [--from <name>] [--force] [--as <GM|Server>]")
+		fmt.Fprintln(stderr, "usage: dunemgr whisper <host> <name|fls> <message> [--from <name>] [--force] [--as <GM|Server>] [--id]")
 		return fmt.Errorf("whisper: usage: %w", ErrUsage)
 	}
 	host, fls := args[0], args[1]
@@ -28,6 +28,7 @@ func whisperCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr
 	from := fs.String("from", "Server", "spoofed author name shown to the player")
 	force := fs.Bool("force", false, "send even if the player appears offline")
 	as := fs.String("as", "", "send as a reserved persona (GM|Server) instead of a spoofed --from name")
+	id := fs.Bool("id", false, "treat <player> as a raw FLS id, skip name resolution")
 	msgParts, flagsTok := splitMessageAndFlags(args[2:])
 	if err := fs.Parse(flagsTok); err != nil {
 		return err
@@ -58,12 +59,19 @@ func whisperCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr
 	}
 
 	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
-	toName, err := dbr.CharacterName(ctx, host, fls)
+	var err error
+	fls, err = resolvePlayerArg(ctx, dbr, host, fls, *id, stderr)
+	if err != nil {
+		return err
+	}
+	var toName string
+	toName, err = dbr.CharacterName(ctx, host, fls)
 	if err != nil {
 		return err
 	}
 	found := toName != ""
-	offline, err := dbr.IsPlayerOffline(ctx, host, fls)
+	var offline bool
+	offline, err = dbr.IsPlayerOffline(ctx, host, fls)
 	if err != nil {
 		return err
 	}

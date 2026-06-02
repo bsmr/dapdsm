@@ -13,9 +13,9 @@ import (
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
 )
 
-const giveUsage = `usage: dunemgr give <host> currency <fls> <currency-id> <delta> [--check] [--force]
-       dunemgr give <host> item <fls> <item-name> <count> [--quality N] [--durability F] [--check]
-       dunemgr give <host> skillpoints <fls> <amount> [--check] [--force]`
+const giveUsage = `usage: dunemgr give <host> currency <name|fls> <currency-id> <delta> [--check] [--force] [--id]
+       dunemgr give <host> item <name|fls> <item-name> <count> [--quality N] [--durability F] [--check] [--id]
+       dunemgr give <host> skillpoints <name|fls> <amount> [--check] [--force] [--id]`
 
 func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
@@ -35,6 +35,7 @@ func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io
 	force := fs.Bool("force", false, "apply a DB-only grant even if the player is online")
 	quality := fs.Int64("quality", 0, "item quality (DB/offline path only)")
 	durability := fs.Float64("durability", 1.0, "item durability (MQ/online path only)")
+	id := fs.Bool("id", false, "treat <player> as a raw FLS id, skip name resolution")
 
 	var req grant.Req
 	req.FLS = giveFirst(rest)
@@ -88,6 +89,13 @@ func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io
 		return fmt.Errorf("give: unknown sub %q: %w", sub, ErrUsage)
 	}
 	req.Force = *force
+
+	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	resolved, err := resolvePlayerArg(ctx, dbr, host, req.FLS, *id, stderr)
+	if err != nil {
+		return err
+	}
+	req.FLS = resolved
 
 	if *check {
 		p, err := g.Plan(ctx, host, req)

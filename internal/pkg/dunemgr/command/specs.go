@@ -16,6 +16,7 @@ const (
 	argHost                   // complete against the known host names
 	argFree                   // freeform (bg name, sql, flags) — no completion
 	argCatalog                // complete against a vendored catalog (items/skills/vehicles)
+	argPlayer                 // completed from the TUI's live per-host player-name cache
 )
 
 // argSlot describes one positional argument of a verb.
@@ -129,7 +130,7 @@ var specs = map[string]Spec{
 		Verb: "whisper", Summary: "Send a private in-game chat message to one player (--from spoof or --as GM|Server)",
 		Args: []argSlot{
 			{kind: argHost, name: "host"},
-			{kind: argFree, name: "fls-id"},
+			{kind: argPlayer, name: "player"},
 			{kind: argFree, name: "message"},
 		},
 	},
@@ -154,6 +155,11 @@ func init() {
 	}
 }
 
+// FirstArgIsHost reports whether the verb's first positional is a host slot.
+func (s Spec) FirstArgIsHost() bool {
+	return len(s.Args) > 0 && s.Args[0].kind == argHost
+}
+
 // IsCatalogPos reports whether the argument slot at pos (0-based) is a
 // catalog-backed slot. The TUI uses this to suppress suggestions on empty tokens
 // (the catalog may have thousands of entries).
@@ -162,6 +168,13 @@ func (s Spec) IsCatalogPos(pos int) bool {
 		return false
 	}
 	return s.Args[pos].kind == argCatalog
+}
+
+// IsPlayerPos reports whether the slot at pos (0-based) is a player-name slot.
+// The TUI uses this to query its live per-host player-name cache instead of
+// the static candidate sets returned by Candidates.
+func (s Spec) IsPlayerPos(pos int) bool {
+	return pos >= 0 && pos < len(s.Args) && s.Args[pos].kind == argPlayer
 }
 
 // Specs returns all verb specs, sorted by verb.
@@ -201,6 +214,8 @@ func (s Spec) Usage() string {
 			out += " <" + a.name + ">"
 		case argFree:
 			out += " <" + a.name + ">"
+		case argPlayer:
+			out += " <" + a.name + ">"
 		}
 	}
 	return out
@@ -228,6 +243,8 @@ func (s Spec) Candidates(pos int, hosts []string, tokens ...string) []string {
 		return append([]string(nil), hosts...)
 	case argCatalog:
 		return catalogCandidates(a.catalogKey, tokens)
+	case argPlayer:
+		return nil // the TUI supplies names from its live per-host cache
 	default: // argFree
 		return nil
 	}

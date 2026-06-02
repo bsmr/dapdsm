@@ -7,7 +7,19 @@ import (
 	"testing"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
+
+func TestGiveUnknownPlayerIsUsageError(t *testing.T) {
+	var out, errb bytes.Buffer
+	// SSH present so discoverDB runs and fails (no such host) → resolvePlayerArg wraps as ErrUsage.
+	c := &core.Core{Store: openTestStore(t), SSH: ssh.NewClient()}
+	// "skillpoints NoSuchName 1" — valid sub + amount so resolution is exercised
+	err := giveCmd(context.Background(), c, []string{"h", "skillpoints", "NoSuchName", "1"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("unknown name should be ErrUsage, got %v", err)
+	}
+}
 
 func TestGiveKnown(t *testing.T) {
 	if !Known("give") {
