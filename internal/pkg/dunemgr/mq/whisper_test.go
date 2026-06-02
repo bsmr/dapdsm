@@ -30,7 +30,7 @@ func TestEncodeWhisperEnvelope(t *testing.T) {
 }
 
 func TestBuildWhisperChatJSON(t *testing.T) {
-	s := buildWhisperChatJSON("Paul", "Server", "hello there", true)
+	s := buildWhisperChatJSON("Paul", "Server", "hello there", true, "")
 	if !strings.Contains(s, `"ETextChatChannelType::Whispers"`) {
 		t.Fatalf("missing whisper channel: %s", s)
 	}
@@ -62,5 +62,19 @@ func TestBuildErlangWhisperDigitFirstFLS(t *testing.T) {
 	}
 	if !strings.Contains(e, "3386A7DC456B968D") {
 		t.Fatalf("digit-first sender fls was dropped: %s", e)
+	}
+}
+
+func TestWhisperChatJSONSetsSenderFuncomID(t *testing.T) {
+	j := buildWhisperChatJSON("Stilgar", "", "hi", false, "GM#0001")
+	if !strings.Contains(j, `"FuncomIdFrom":"GM#0001"`) {
+		t.Fatalf("sender funcom-id not set: %s", j)
+	}
+}
+
+func TestWhisperChatJSONSpoofHasEmptySender(t *testing.T) {
+	j := buildWhisperChatJSON("Stilgar", "GM", "hi", true, "")
+	if !strings.Contains(j, `"FuncomIdFrom":""`) {
+		t.Fatalf("spoof sender should be empty: %s", j)
 	}
 }

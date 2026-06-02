@@ -19,8 +19,9 @@ const whisperExchange = "chat.whispers"
 // buildWhisperChatJSON renders the inner Funcom chat message for a whisper.
 // Field names follow the C++ FChatMessageData convention (m_ prefix stripped).
 // spoof controls whether bUseSpoofedUserName is set; fromName populates
-// SpoofedUserNameFrom.AuthorName.
-func buildWhisperChatJSON(toName, fromName, message string, spoof bool) string {
+// SpoofedUserNameFrom.AuthorName. fromFuncomID sets m_FuncomIdFrom (the chat
+// display sender; distinct from the AMQP user_id frame).
+func buildWhisperChatJSON(toName, fromName, message string, spoof bool, fromFuncomID string) string {
 	msg := struct {
 		ID           string `json:"Id"`
 		ChannelType  string `json:"ChannelType"`
@@ -36,6 +37,7 @@ func buildWhisperChatJSON(toName, fromName, message string, spoof bool) string {
 	}{
 		ID:                 "dunemgr-whisper",
 		ChannelType:        "ETextChatChannelType::Whispers",
+		FuncomIdFrom:       fromFuncomID,
 		UserNameTo:         toName,
 		UseSpoofedUserName: spoof,
 	}
@@ -94,15 +96,17 @@ func BuildErlangWhisper(payloadB64, targetFLS, senderFLS string) string {
 
 // PublishWhisper sends a private chat message to targetFLS on host. toName is
 // the recipient display name; fromName is the spoofed author shown to the
-// recipient (empty → bUseSpoofedUserName=false); senderFLS is the AMQP
-// user_id field (may be empty — rejected by flsRE → blank).
+// recipient (empty → bUseSpoofedUserName=false). senderHexID is the AMQP
+// user_id frame (must be pure hex; may be empty — rejected by flsRE → blank).
+// senderFuncomID is the chat m_FuncomIdFrom value (displayed in the message
+// body; distinct from the AMQP frame). Pass "" for both on spoof sends.
 //
 // targetFLS must be a valid hex FLS ID; an error is returned immediately if
 // it fails validation so the whisper is never silently dropped.
 //
 // Audit captures operator/host/targetFLS and outcome; the message body is
 // never written to the audit log.
-func (p *Publisher) PublishWhisper(ctx context.Context, operator, host, targetFLS, toName, fromName, senderFLS, message string) (*Result, error) {
+func (p *Publisher) PublishWhisper(ctx context.Context, operator, host, targetFLS, toName, fromName, senderHexID, senderFuncomID, message string) (*Result, error) {
 	audit := store.AuditEntry{Operator: operator, Host: host, Action: "whisper", Subject: "fls=" + targetFLS}
 
 	if !flsRE.MatchString(targetFLS) {
@@ -119,9 +123,9 @@ func (p *Publisher) PublishWhisper(ctx context.Context, operator, host, targetFL
 		return nil, err
 	}
 
-	chat := buildWhisperChatJSON(toName, fromName, message, fromName != "")
+	chat := buildWhisperChatJSON(toName, fromName, message, fromName != "", senderFuncomID)
 	payloadB64 := EncodeWhisperEnvelope(chat)
-	erlang := BuildErlangWhisper(payloadB64, targetFLS, senderFLS)
+	erlang := BuildErlangWhisper(payloadB64, targetFLS, senderHexID)
 	shell := "set -eu; " +
 		"export PATH=/opt/rabbitmq/sbin:/opt/erlang/lib/erlang/bin:/bin:/usr/bin:/usr/local/bin:$PATH; " +
 		"cat > /tmp/dunemgr-whisper.erl; expr=$(cat /tmp/dunemgr-whisper.erl); " +

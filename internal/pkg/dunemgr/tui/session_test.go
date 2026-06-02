@@ -91,7 +91,14 @@ func TestCommandBarSession(t *testing.T) {
 	if m.input.Value() != "" {
 		t.Errorf("input not cleared after Enter: %q", m.input.Value())
 	}
-	wantView("6 help", "── result ──", "lifecycle <host>", "backup", "shutdown", "help [verb]")
+	// The rendered pane shows only the first outputWindow lines; check the full
+	// output buffer directly for items that may be scrolled out of view.
+	wantView("6 help", "── result ──", "lifecycle <host>", "backup")
+	for _, want := range []string{"lifecycle <host>", "backup", "shutdown", "help [verb]"} {
+		if !strings.Contains(m.output, want) {
+			t.Errorf("[6 help] output buffer missing %q", want)
+		}
+	}
 
 	// Step 7: a live action frame appends to the event log and the detail pane.
 	apply(pollMsg{host: "vm-b", kind: pollAction, action: "restart", result: "ok"})

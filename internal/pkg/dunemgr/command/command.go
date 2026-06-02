@@ -29,6 +29,7 @@ var table = map[string]Handler{
 	"backup":    backupCmd,
 	"broadcast": broadcastCmd,
 	"db":        dbCmd,
+	"give":      giveCmd,
 	"host":      hostCmd,
 	"ini":       iniCmd,
 	"lifecycle": lifecycleCmd,

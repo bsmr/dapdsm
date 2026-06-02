@@ -1,7 +1,9 @@
 package dbquery
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,6 +23,10 @@ type PlayerDetail struct {
 	StackTotal    int64
 	Inventories   []InvBreakdown
 	TopItems      []InvItem
+	Progression   *Progression // nil if FLevelComponent absent
+	Vitals        *Vitals      // nil if FHealthComponent absent
+	Spice         *SpiceState  // nil if FSpiceAddictionComponent absent
+	RawComponents string       // pretty components JSON when raw=true
 }
 
 // InvBreakdown is per-inventory-type item count for the player's pawn.
@@ -42,8 +48,9 @@ const pawnSubquery = `(SELECT ps.player_pawn_id FROM dune.player_state ps ` +
 	`JOIN dune.accounts a ON a.id = ps.account_id WHERE a."user"::text = :'fls' LIMIT 1)`
 
 // PlayerInspect returns a header + inventory aggregate for fls. topN bounds the
-// top-by-quality item list (≤0 defaults to 10; capped at 50). Read-only; no audit.
-func (r *Runner) PlayerInspect(ctx context.Context, host, fls string, topN int) (*PlayerDetail, error) {
+// top-by-quality item list (≤0 defaults to 10; capped at 50). When raw is true,
+// the character components JSON is pretty-printed into RawComponents. Read-only; no audit.
+func (r *Runner) PlayerInspect(ctx context.Context, host, fls string, topN int, raw bool) (*PlayerDetail, error) {
 	if topN <= 0 {
 		topN = 10
 	}
@@ -126,6 +133,39 @@ ORDER BY i.quality_level DESC, i.stack_size DESC LIMIT :lim;`
 		ss, _ := strconv.ParseInt(p[1], 10, 64)
 		q, _ := strconv.ParseInt(p[2], 10, 64)
 		d.TopItems = append(d.TopItems, InvItem{TemplateID: p[0], StackSize: ss, Quality: q})
+	}
+
+	// execWithVars #5: character components (one jsonb line) for progression/vitals/spice.
+	const componentsSQL = `SELECT fe.components
+FROM dune.fgl_entities fe
+JOIN dune.actor_fgl_entities afe ON afe.entity_id = fe.entity_id
+JOIN dune.player_state ps ON ps.player_pawn_id = afe.actor_id
+JOIN dune.accounts a ON a.id = ps.account_id
+WHERE a."user"::text = :'fls' AND afe.slot_name = 'DuneCharacter'
+LIMIT 1;`
+	cres, err := r.execWithVars(ctx, host, componentsSQL, vars)
+	if err != nil {
+		return nil, fmt.Errorf("player inspect components: %w", err)
+	}
+	comp := strings.TrimSpace(cres.Stdout)
+	if comp != "" {
+		if p, ok := parseProgression([]byte(comp)); ok {
+			d.Progression = &p
+		}
+		if v, ok := parseVitals([]byte(comp)); ok {
+			d.Vitals = &v
+		}
+		if s, ok := parseSpice([]byte(comp)); ok {
+			d.Spice = &s
+		}
+		if raw {
+			var buf bytes.Buffer
+			if json.Indent(&buf, []byte(comp), "", "  ") == nil {
+				d.RawComponents = buf.String()
+			} else {
+				d.RawComponents = comp
+			}
+		}
 	}
 	return d, nil
 }
