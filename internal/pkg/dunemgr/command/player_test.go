@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
 	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
 )
@@ -99,5 +100,22 @@ func TestPlayerSpecHasInspect(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("player spec sub-verbs missing inspect: %v", s.Args[1].options)
+	}
+}
+
+func TestPrintInspectRendersNewSections(t *testing.T) {
+	var b bytes.Buffer
+	d := &dbquery.PlayerDetail{
+		FLSID: "FLS1", Found: true, CharacterName: "Stilgar", OnlineStatus: "Offline",
+		Progression: &dbquery.Progression{TotalSkillPoints: 42, UnspentSkillPoints: 7, TotalXPEarned: 12345, ActivePerks: 2},
+		Vitals:      &dbquery.Vitals{CurrentHealth: 150},
+		Spice:       &dbquery.SpiceState{SystemStatus: "AddictionDisabled", SpiceVision: "FullyEnabled"},
+	}
+	printInspect(&b, d)
+	out := b.String()
+	for _, want := range []string{"skill points", "42", "unspent", "7", "health", "150", "spice", "AddictionDisabled"} {
+		if !strings.Contains(strings.ToLower(out), strings.ToLower(want)) {
+			t.Errorf("inspect output missing %q:\n%s", want, out)
+		}
 	}
 }

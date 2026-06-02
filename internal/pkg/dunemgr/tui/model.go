@@ -90,11 +90,17 @@ type model struct {
 	selected int
 	events   []string
 
-	input  textinput.Model
-	output string // last command result pane
+	input     textinput.Model
+	output    string // last command result pane
+	outScroll int    // scroll offset into the output pane (lines)
+	history   []string
+	histIdx   int
 }
 
 const maxEvents = 200
+
+// outputWindow is the number of lines shown at once in the output pane.
+const outputWindow = 10
 
 // newModel builds the root model. ctx/core may be nil in unit tests that only
 // exercise key handling that does not dispatch.
@@ -173,8 +179,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.SetValue(completed)
 				m.input.CursorEnd()
 				return m, nil
+			case tea.KeyUp:
+				if m.histIdx > 0 {
+					m.histIdx--
+					m.input.SetValue(m.history[m.histIdx])
+					m.input.CursorEnd()
+				}
+				return m, nil
+			case tea.KeyDown:
+				if m.histIdx < len(m.history)-1 {
+					m.histIdx++
+					m.input.SetValue(m.history[m.histIdx])
+					m.input.CursorEnd()
+				} else {
+					m.histIdx = len(m.history)
+					m.input.SetValue("")
+				}
+				return m, nil
 			case tea.KeyEnter:
 				line := m.input.Value()
+				if strings.TrimSpace(line) != "" {
+					m.history = append(m.history, line)
+				}
+				m.histIdx = len(m.history)
 				m.input.SetValue("")
 				m.input.Blur()
 				m.mode = modeNav
@@ -189,6 +216,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		// modeNav key handling.
+		// PgDown/PgUp scroll the output pane; checked by type before the
+		// string switch so the bubbletea key-string representation doesn't
+		// matter (the test exercises Type directly).
+		switch msg.Type {
+		case tea.KeyPgDown:
+			lines := len(strings.Split(strings.TrimRight(m.output, "\n"), "\n"))
+			maxScroll := lines - outputWindow
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+			if m.outScroll < maxScroll {
+				m.outScroll++
+			}
+			return m, nil
+		case tea.KeyPgUp:
+			if m.outScroll > 0 {
+				m.outScroll--
+			}
+			return m, nil
+		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -216,6 +263,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case cmdResultMsg:
 		m.mode = modeNav
+		m.outScroll = 0
 		if msg.err != nil {
 			m.output = msg.out + "\nerror: " + msg.err.Error()
 		} else {
@@ -258,13 +306,16 @@ func (m model) View() string {
 	}
 	var outputPane string
 	if m.output != "" {
-		outputPane = renderOutput(m.output)
+		outputPane = renderOutputScrolled(m.output, m.outScroll, outputWindow)
 	}
 	var bottom string
 	if m.mode == modeCmd {
 		bottom = m.input.View() + "\n"
 		if sugg := suggest(m.input.Value(), m.hosts); len(sugg) > 0 {
 			bottom += styleErr.Render(renderSuggestions(sugg)) + "\n"
+		}
+		if hint := usageHint(m.input.Value()); hint != "" {
+			bottom += styleErr.Render(hint) + "\n"
 		}
 	} else {
 		bottom = "[:] command  [tab] focus  [q] quit\n"

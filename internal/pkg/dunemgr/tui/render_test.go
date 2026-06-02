@@ -92,3 +92,14 @@ func TestRenderViewIncludesAllPanes(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderHostListShowsBadges(t *testing.T) {
+	st := map[string]hostStatus{
+		"vm-a": {bgState: "Running", ready: 3, total: 3, reachable: true},
+		"vm-b": {bgState: "Stopped", ready: 0, total: 3, reachable: false},
+	}
+	out := renderHostList([]string{"vm-a", "vm-b"}, st, 0)
+	if !strings.Contains(out, "●") || !strings.Contains(out, "○") {
+		t.Fatalf("expected reachable/unreachable badges:\n%s", out)
+	}
+}

@@ -34,9 +34,10 @@ func TestPlayerInspectParses(t *testing.T) {
 		"45|320\n",
 		"0|40\n1|5\n",
 		"item.water|10|3\nitem.blade|1|5\n",
+		"", // components: empty → no Progression/Vitals/Spice populated
 	}}
 	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
-	d, err := r.PlayerInspect(context.Background(), "h", "FLS1", 10)
+	d, err := r.PlayerInspect(context.Background(), "h", "FLS1", 10, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,11 +63,58 @@ func TestPlayerInspectParses(t *testing.T) {
 func TestPlayerInspectNotFound(t *testing.T) {
 	rr := &seqRunner{resp: []string{"\n"}}
 	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
-	d, err := r.PlayerInspect(context.Background(), "h", "NOPE", 10)
+	d, err := r.PlayerInspect(context.Background(), "h", "NOPE", 10, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.Found {
 		t.Fatal("want Found=false for unknown fls")
+	}
+}
+
+func TestPlayerInspectParsesComponents(t *testing.T) {
+	rr := &seqRunner{resp: []string{
+		"Stilgar|Offline|2026-06-01 21:40:55|2\n", // header
+		"45|320\n",                                 // totals
+		"0|40\n",                                   // breakdown
+		"item.blade|1|5\n",                         // top items
+		fixtureComponents + "\n",                   // components (single jsonb line)
+	}}
+	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	d, err := r.PlayerInspect(context.Background(), "h", "FLS1", 10, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Progression == nil || d.Progression.UnspentSkillPoints != 7 {
+		t.Fatalf("progression wrong: %+v", d.Progression)
+	}
+	if d.Vitals == nil || d.Vitals.CurrentHealth != 150.0 {
+		t.Fatalf("vitals wrong: %+v", d.Vitals)
+	}
+	if d.Spice == nil || d.Spice.SystemStatus != "AddictionDisabled" {
+		t.Fatalf("spice wrong: %+v", d.Spice)
+	}
+	if d.RawComponents != "" {
+		t.Fatalf("raw should be empty when raw=false, got %q", d.RawComponents)
+	}
+	for _, s := range rr.sqls {
+		if strings.Contains(s, "FLS1") {
+			t.Fatalf("fls leaked into SQL body: %q", s)
+		}
+	}
+}
+
+func TestPlayerInspectRawPopulatesComponents(t *testing.T) {
+	rr := &seqRunner{resp: []string{
+		"Stilgar|Offline|2026-06-01 21:40:55|2\n", "45|320\n", "0|40\n", "item.blade|1|5\n",
+		fixtureComponents + "\n",
+	}}
+	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	d, err := r.PlayerInspect(context.Background(), "h", "FLS1", 10, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(d.RawComponents, "FLevelComponent") {
+		t.Fatalf("raw components not populated: %q", d.RawComponents)
 	}
 }

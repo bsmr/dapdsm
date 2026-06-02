@@ -74,6 +74,14 @@ var specs = map[string]Spec{
 			{kind: argFree, name: "args"},
 		},
 	},
+	"give": {
+		Verb: "give", Summary: "Grant currency/item/skillpoints to a player (presence-aware)",
+		Args: []argSlot{
+			{kind: argHost, name: "host"},
+			{kind: argFixed, options: []string{"currency", "item", "skillpoints"}, name: "sub"},
+			{kind: argFree, name: "args"},
+		},
+	},
 	"player": {
 		Verb: "player", Summary: "Look up / inspect a player by name or FLS-ID",
 		Args: []argSlot{
@@ -118,7 +126,7 @@ var specs = map[string]Spec{
 		Args: []argSlot{{kind: argHost, name: "host"}},
 	},
 	"whisper": {
-		Verb: "whisper", Summary: "Send a private in-game chat message to one player",
+		Verb: "whisper", Summary: "Send a private in-game chat message to one player (--from spoof or --as GM|Server)",
 		Args: []argSlot{
 			{kind: argHost, name: "host"},
 			{kind: argFree, name: "fls-id"},

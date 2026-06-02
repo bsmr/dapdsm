@@ -90,6 +90,18 @@ func splitCurrent(line string) (tokens []string, current string) {
 	return f[:len(f)-1], f[len(f)-1]
 }
 
+// usageHint returns the one-line usage for the verb being typed, or "".
+func usageHint(line string) string {
+	f := strings.Fields(line)
+	if len(f) == 0 {
+		return ""
+	}
+	if s, ok := command.SpecFor(f[0]); ok {
+		return s.Usage()
+	}
+	return ""
+}
+
 func longestCommonPrefix(ss []string) string {
 	if len(ss) == 0 {
 		return ""

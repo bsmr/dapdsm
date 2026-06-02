@@ -1,0 +1,119 @@
+package command
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"io"
+	"strconv"
+
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/grant"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
+)
+
+const giveUsage = `usage: dunemgr give <host> currency <fls> <currency-id> <delta> [--check] [--force]
+       dunemgr give <host> item <fls> <item-name> <count> [--quality N] [--durability F] [--check]
+       dunemgr give <host> skillpoints <fls> <amount> [--check] [--force]`
+
+func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
+	if len(args) < 2 {
+		fmt.Fprintln(stderr, giveUsage)
+		return fmt.Errorf("give: usage: %w", ErrUsage)
+	}
+	host, sub, rest := args[0], args[1], args[2:]
+	g := &grant.Granter{
+		DB:    &dbquery.Runner{SSH: c.SSH, Store: c.Store},
+		MQ:    &mq.Publisher{SSH: c.SSH, Store: c.Store},
+		Store: c.Store,
+	}
+
+	fs := flag.NewFlagSet("give", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	check := fs.Bool("check", false, "dry-run: resolve target/presence/backend, change nothing")
+	force := fs.Bool("force", false, "apply a DB-only grant even if the player is online")
+	quality := fs.Int64("quality", 0, "item quality (DB/offline path only)")
+	durability := fs.Float64("durability", 1.0, "item durability (MQ/online path only)")
+
+	var req grant.Req
+	req.FLS = giveFirst(rest)
+	switch sub {
+	case "currency":
+		if len(rest) < 3 {
+			fmt.Fprintln(stderr, giveUsage)
+			return fmt.Errorf("give currency: usage: %w", ErrUsage)
+		}
+		cid, err1 := strconv.Atoi(rest[1])
+		delta, err2 := strconv.ParseInt(rest[2], 10, 64)
+		if err1 != nil || err2 != nil {
+			fmt.Fprintln(stderr, "give currency: <currency-id> and <delta> must be integers")
+			return fmt.Errorf("give currency: parse: %w", ErrUsage)
+		}
+		req.Verb, req.CurrencyID, req.Delta = grant.VerbCurrency, cid, delta
+		if err := fs.Parse(rest[3:]); err != nil {
+			return err
+		}
+	case "item":
+		if len(rest) < 3 {
+			fmt.Fprintln(stderr, giveUsage)
+			return fmt.Errorf("give item: usage: %w", ErrUsage)
+		}
+		count, err := strconv.ParseInt(rest[2], 10, 64)
+		if err != nil {
+			fmt.Fprintln(stderr, "give item: <count> must be an integer")
+			return fmt.Errorf("give item: parse: %w", ErrUsage)
+		}
+		req.Verb, req.Item, req.Count = grant.VerbItem, rest[1], count
+		if err := fs.Parse(rest[3:]); err != nil {
+			return err
+		}
+		req.Quality, req.Durability = *quality, *durability
+	case "skillpoints":
+		if len(rest) < 2 {
+			fmt.Fprintln(stderr, giveUsage)
+			return fmt.Errorf("give skillpoints: usage: %w", ErrUsage)
+		}
+		amount, err := strconv.ParseInt(rest[1], 10, 64)
+		if err != nil {
+			fmt.Fprintln(stderr, "give skillpoints: <amount> must be an integer")
+			return fmt.Errorf("give skillpoints: parse: %w", ErrUsage)
+		}
+		req.Verb, req.Amount = grant.VerbSkillpoints, amount
+		if err := fs.Parse(rest[2:]); err != nil {
+			return err
+		}
+	default:
+		fmt.Fprintf(stderr, "unknown give subcommand %q (want currency|item|skillpoints)\n", sub)
+		return fmt.Errorf("give: unknown sub %q: %w", sub, ErrUsage)
+	}
+	req.Force = *force
+
+	if *check {
+		p, err := g.Plan(ctx, host, req)
+		if err != nil {
+			return err
+		}
+		presence := "online"
+		if p.Offline {
+			presence = "offline"
+		}
+		fmt.Fprintf(stdout, "dry-run (nothing changed):\n  target=%s  presence=%s  backend=%s\n  action=%s\n",
+			p.FLS, presence, p.Backend, p.Summary)
+		return nil
+	}
+	res, err := g.Apply(ctx, "cli", host, req)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "grant ok: %s\n", res.Detail)
+	return nil
+}
+
+// giveFirst returns the first element of s, or "" when empty.
+func giveFirst(s []string) string {
+	if len(s) == 0 {
+		return ""
+	}
+	return s[0]
+}

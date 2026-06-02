@@ -156,3 +156,45 @@ func TestHelpCommandFillsOutputPane(t *testing.T) {
 		}
 	}
 }
+
+func TestCommandHistoryRecall(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.mode = modeCmd
+	m.history = []string{"host list", "lifecycle vm-a restart"}
+	m.histIdx = len(m.history)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if got := m2.(model).input.Value(); got != "lifecycle vm-a restart" {
+		t.Fatalf("up recall = %q", got)
+	}
+}
+
+func TestUsageHintForTypedVerb(t *testing.T) {
+	hint := usageHint("give cur")
+	if !strings.Contains(hint, "give") {
+		t.Fatalf("usage hint missing verb: %q", hint)
+	}
+}
+
+func TestOutputScrollOffsetClamps(t *testing.T) {
+	m := newModel(context.Background(), nil)
+	m.output = strings.Repeat("line\n", 100)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	if m2.(model).outScroll <= 0 {
+		t.Fatal("PgDown should advance output scroll")
+	}
+	m3, _ := m2.(model).Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	if m3.(model).outScroll != 0 {
+		t.Fatalf("PgUp from one step should return to 0, got %d", m3.(model).outScroll)
+	}
+
+	// PgDown far past the end must clamp at maxScroll (lines - window), not run away.
+	mm := newModel(context.Background(), nil)
+	mm.output = strings.Repeat("line\n", 100) // 100 lines, window 10 → maxScroll 90
+	for i := 0; i < 200; i++ {
+		next, _ := mm.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+		mm = next.(model)
+	}
+	if mm.outScroll != 90 {
+		t.Fatalf("PgDown should clamp at maxScroll=90, got %d", mm.outScroll)
+	}
+}

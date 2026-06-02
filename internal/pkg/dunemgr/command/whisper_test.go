@@ -31,3 +31,21 @@ func TestWhisperEmptyMessage(t *testing.T) {
 		t.Fatalf("empty message should be ErrUsage, got %v", err)
 	}
 }
+
+func TestWhisperAsAndFromMutuallyExclusive(t *testing.T) {
+	var out, errb bytes.Buffer
+	c := &core.Core{Store: openTestStore(t)}
+	err := whisperCmd(context.Background(), c, []string{"h", "ABCD", "hello", "--from", "X", "--as", "GM"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("--from with --as must be ErrUsage, got %v", err)
+	}
+}
+
+func TestWhisperAsUnknownPersona(t *testing.T) {
+	var out, errb bytes.Buffer
+	c := &core.Core{Store: openTestStore(t)}
+	err := whisperCmd(context.Background(), c, []string{"h", "ABCD", "hello", "--as", "bogus"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("unknown persona must be ErrUsage, got %v", err)
+	}
+}

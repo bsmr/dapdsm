@@ -30,7 +30,11 @@ func renderHostList(hosts []string, st map[string]hostStatus, selected int) stri
 		if state == "" {
 			state = "…"
 		}
-		row := fmt.Sprintf("%s %-14s %-9s %d/%d", cursor, h, state, s.ready, s.total)
+		badge := "○"
+		if s.reachable {
+			badge = "●"
+		}
+		row := fmt.Sprintf("%s %s %-14s %-9s %d/%d", cursor, badge, h, state, s.ready, s.total)
 		if i == selected {
 			row = styleSelected.Render(row)
 		}
@@ -73,9 +77,21 @@ func renderEvents(events []string, max int) string {
 	return strings.Join(events[start:], "\n") + "\n"
 }
 
-// renderOutput renders the command result pane with a titled separator.
-func renderOutput(out string) string {
-	return "── result ──\n" + out + "────────────\n"
+// renderOutputScrolled renders a windowed slice of out starting at scroll,
+// showing at most window lines.
+func renderOutputScrolled(out string, scroll, window int) string {
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if scroll > len(lines) {
+		scroll = len(lines)
+	}
+	if scroll < 0 {
+		scroll = 0
+	}
+	end := scroll + window
+	if end > len(lines) {
+		end = len(lines)
+	}
+	return "── result ──\n" + strings.Join(lines[scroll:end], "\n") + "\n────────────\n"
 }
 
 // suggestLineCap is the maximum number of candidates shown in the suggestion
