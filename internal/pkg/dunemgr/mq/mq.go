@@ -292,18 +292,70 @@ type Publisher struct {
 	Token         TokenSource
 }
 
+// discoverGamePod resolves the (namespace, pod) of the mq-game broker,
+// honoring p.Namespace / p.MQPodSelector. Shared by PublishInner and
+// PublishWhisper; returns a plain error without touching the audit log.
+//
+// Discovery strategy:
+//   - When Publisher.Namespace is set, query is scoped to that namespace;
+//     pod names are returned without a namespace prefix.
+//   - When Publisher.Namespace == "" (the default), query uses -A (all
+//     namespaces) and emits "namespace/podname" lines so both are resolved
+//     in one call. This is required because MQ pods live in the BattleGroup
+//     namespace (e.g. funcom-seabass-…), not "dune".
+func (p *Publisher) discoverGamePod(ctx context.Context, host string) (ns, pod string, err error) {
+	sel := p.MQPodSelector
+	if sel == "" {
+		sel = DefaultMQPodSelector
+	}
+
+	if p.Namespace != "" {
+		// Explicit namespace override: scope to it, plain pod names.
+		podListRes, lerr := p.SSH.Run(ctx, host, "kubectl", "get", "pods",
+			"-n", p.Namespace, "-l", sel,
+			"-o", `jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}`)
+		if lerr != nil || podListRes.ExitCode != 0 {
+			return "", "", fmt.Errorf("list mq pods in %s (selector %s): %w", p.Namespace, sel, lerr)
+		}
+		var podNames []string
+		for _, line := range strings.Split(podListRes.Stdout, "\n") {
+			if name := strings.TrimSpace(line); name != "" {
+				podNames = append(podNames, name)
+			}
+		}
+		picked, ok := pickGamePod(podNames)
+		if !ok {
+			return "", "", fmt.Errorf("no mq-game broker pod found in %s for selector %s", p.Namespace, sel)
+		}
+		return p.Namespace, picked, nil
+	}
+
+	// Auto-discover: query all namespaces, emit namespace/podname per line.
+	podListRes, lerr := p.SSH.Run(ctx, host, "kubectl", "get", "pods",
+		"-A", "-l", sel,
+		"-o", `jsonpath={range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\n"}{end}`)
+	if lerr != nil || podListRes.ExitCode != 0 {
+		return "", "", fmt.Errorf("list mq pods across all namespaces (selector %s): %w", sel, lerr)
+	}
+	var lines []string
+	for _, line := range strings.Split(podListRes.Stdout, "\n") {
+		if l := strings.TrimSpace(line); l != "" {
+			lines = append(lines, l)
+		}
+	}
+	ns, pod, ok := pickGameNsPod(lines)
+	if !ok {
+		return "", "", fmt.Errorf("no mq-game broker pod found across all namespaces for selector %s", sel)
+	}
+	return ns, pod, nil
+}
+
 // PublishInner encodes innerJSON inside the Funcom envelope, locates the
 // mq-game RabbitMQ pod, and pipes the Erlang expression to `rabbitmqctl eval`.
 // The audit entry is written to the Store regardless of outcome.
 //
-// Pod/namespace discovery:
-//   - When Publisher.Namespace == "" (the default), the pod list query uses -A
-//     (all namespaces) and the jsonpath emits "namespace/podname" lines so that
-//     both are discovered in one call. This is required because the MQ pods live
-//     in the BattleGroup namespace (e.g. funcom-seabass-…), not "dune".
-//   - When Publisher.Namespace is set, the query is scoped to that namespace and
-//     pod names are returned without a namespace prefix; the explicit namespace is
-//     used for the exec.
+// Pod/namespace discovery is delegated to discoverGamePod (shared with
+// PublishWhisper); discovery errors are written to the audit log here.
 //
 // Parameters:
 //
@@ -315,10 +367,6 @@ type Publisher struct {
 //	label     — short identifier for the server-side log line; sanitized
 //	            against an allowlist to prevent Erlang-string injection.
 func (p *Publisher) PublishInner(ctx context.Context, operator, host, action, subject, innerJSON, label string) (*Result, error) {
-	sel := p.MQPodSelector
-	if sel == "" {
-		sel = DefaultMQPodSelector
-	}
 	ts := p.Token
 	if ts == nil {
 		ts = defaultTokenChain()
@@ -339,61 +387,12 @@ func (p *Publisher) PublishInner(ctx context.Context, operator, host, action, su
 		return nil, err
 	}
 
-	// 2. List all pods matching the selector, then pick the mq-game broker.
-	// When Namespace is not set, query across all namespaces (-A) and emit
-	// "namespace/podname" lines so both are resolved in one kubectl call.
-	var pod, ns string
-	if p.Namespace != "" {
-		// Explicit namespace override: scope to it, plain pod names.
-		podListRes, lerr := p.SSH.Run(ctx, host, "kubectl", "get", "pods",
-			"-n", p.Namespace, "-l", sel,
-			"-o", `jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}`)
-		if lerr != nil || podListRes.ExitCode != 0 {
-			msg := fmt.Sprintf("error: list mq pods: exit=%d", podListRes.ExitCode)
-			audit.Result = msg
-			_ = p.Store.AppendAudit(audit)
-			return nil, fmt.Errorf("list mq pods in %s (selector %s): %w", p.Namespace, sel, lerr)
-		}
-		var podNames []string
-		for _, line := range strings.Split(podListRes.Stdout, "\n") {
-			if name := strings.TrimSpace(line); name != "" {
-				podNames = append(podNames, name)
-			}
-		}
-		var ok bool
-		pod, ok = pickGamePod(podNames)
-		if !ok {
-			msg := fmt.Sprintf("no mq-game broker pod found in %s for selector %s", p.Namespace, sel)
-			audit.Result = "error: " + msg
-			_ = p.Store.AppendAudit(audit)
-			return nil, fmt.Errorf("%s", msg)
-		}
-		ns = p.Namespace
-	} else {
-		// Auto-discover: query all namespaces, emit namespace/podname per line.
-		podListRes, lerr := p.SSH.Run(ctx, host, "kubectl", "get", "pods",
-			"-A", "-l", sel,
-			"-o", `jsonpath={range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\n"}{end}`)
-		if lerr != nil || podListRes.ExitCode != 0 {
-			msg := fmt.Sprintf("error: list mq pods (all-ns): exit=%d", podListRes.ExitCode)
-			audit.Result = msg
-			_ = p.Store.AppendAudit(audit)
-			return nil, fmt.Errorf("list mq pods across all namespaces (selector %s): %w", sel, lerr)
-		}
-		var lines []string
-		for _, line := range strings.Split(podListRes.Stdout, "\n") {
-			if l := strings.TrimSpace(line); l != "" {
-				lines = append(lines, l)
-			}
-		}
-		var ok bool
-		ns, pod, ok = pickGameNsPod(lines)
-		if !ok {
-			msg := fmt.Sprintf("no mq-game broker pod found across all namespaces for selector %s", sel)
-			audit.Result = "error: " + msg
-			_ = p.Store.AppendAudit(audit)
-			return nil, fmt.Errorf("%s", msg)
-		}
+	// 2. Discover the mq-game broker pod and its namespace.
+	ns, pod, err := p.discoverGamePod(ctx, host)
+	if err != nil {
+		audit.Result = "error: " + err.Error()
+		_ = p.Store.AppendAudit(audit)
+		return nil, err
 	}
 
 	// 3. Build payload + Erlang and exec using the discovered (or explicit) namespace.

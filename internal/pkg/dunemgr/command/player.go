@@ -12,12 +12,13 @@ import (
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
 )
 
-// playerCmd runs player-lookup sub-commands (search|pos) against the
+// playerCmd runs player-lookup sub-commands (search|pos|inspect) against the
 // BattleGroup database on the named host via SSH + kubectl exec.
 func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
 		fmt.Fprintln(stderr, "usage: dunemgr player <host> search <query> [--limit N]")
 		fmt.Fprintln(stderr, "       dunemgr player <host> pos <fls-id>")
+		fmt.Fprintln(stderr, "       dunemgr player <host> inspect <fls-id> [--top N]")
 		return fmt.Errorf("player: usage: %w", ErrUsage)
 	}
 	host, sub, rest := args[0], args[1], args[2:]
@@ -51,8 +52,28 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 		}
 		printPos(stdout, pos)
 		return nil
+	case "inspect":
+		if len(rest) < 1 {
+			fmt.Fprintln(stderr, "usage: dunemgr player <host> inspect <fls-id> [--top N]")
+			return fmt.Errorf("player inspect: usage: %w", ErrUsage)
+		}
+		flsID := rest[0]
+		top := 10
+		for i := 1; i+1 < len(rest); i++ {
+			if rest[i] == "--top" {
+				if n, e := strconv.Atoi(rest[i+1]); e == nil {
+					top = n
+				}
+			}
+		}
+		d, err := r.PlayerInspect(ctx, host, flsID, top)
+		if err != nil {
+			return err
+		}
+		printInspect(stdout, d)
+		return nil
 	default:
-		fmt.Fprintf(stderr, "unknown player subcommand %q (want search|pos)\n", sub)
+		fmt.Fprintf(stderr, "unknown player subcommand %q (want search|pos|inspect)\n", sub)
 		return fmt.Errorf("player: unknown sub %q: %w", sub, ErrUsage)
 	}
 }
@@ -81,6 +102,38 @@ func printPlayers(w io.Writer, players []dbquery.Player) {
 			p.FLSID, p.CharacterName, p.OnlineStatus, p.LastSeen)
 	}
 	_ = tw.Flush()
+}
+
+// printInspect renders a player detail (header + inventory) to w.
+func printInspect(w io.Writer, d *dbquery.PlayerDetail) {
+	if !d.Found {
+		fmt.Fprintf(w, "no player with fls %s\n", d.FLSID)
+		return
+	}
+	fmt.Fprintf(w, "player %s (%s)\n", d.CharacterName, d.FLSID)
+	fmt.Fprintf(w, "  status=%s  last-seen=%s  partition=%s\n", d.OnlineStatus, d.LastSeen, valueOrDash(d.Partition))
+	fmt.Fprintf(w, "  inventory: %d items in %d inventories, %d total stacks\n",
+		d.ItemCount, len(d.Inventories), d.StackTotal)
+	for _, inv := range d.Inventories {
+		fmt.Fprintf(w, "    inv-type %d: %d items\n", inv.InventoryType, inv.ItemCount)
+	}
+	if len(d.TopItems) > 0 {
+		fmt.Fprintln(w, "  top items by quality:")
+		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(tw, "    TEMPLATE\tSTACK\tQUALITY")
+		for _, it := range d.TopItems {
+			fmt.Fprintf(tw, "    %s\t%d\t%d\n", it.TemplateID, it.StackSize, it.Quality)
+		}
+		_ = tw.Flush()
+	}
+}
+
+// valueOrDash returns s unchanged, or "-" if s is empty.
+func valueOrDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
 }
 
 // printPos renders a position row to w.

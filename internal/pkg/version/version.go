@@ -15,7 +15,7 @@ import (
 )
 
 // Semantic version of the dapdsm tools (dunectl + dunemgr). Bump per release.
-var Version = "0.1.6"
+var Version = "0.1.7"
 
 // Short git revision. Empty when built from an unclean tree or outside git.
 var Commit = ""

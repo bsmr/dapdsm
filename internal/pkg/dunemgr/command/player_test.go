@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -74,5 +75,29 @@ func TestPlayerPosRequiresFLSID(t *testing.T) {
 func TestPlayerRegisteredInDispatchTable(t *testing.T) {
 	if !Known("player") {
 		t.Error(`"player" verb not registered in dispatch table`)
+	}
+}
+
+func TestPlayerInspectUsage(t *testing.T) {
+	var out, errb bytes.Buffer
+	err := Dispatch(context.Background(), &core.Core{}, []string{"player", "h", "inspect"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("inspect without fls should be ErrUsage, got %v", err)
+	}
+}
+
+func TestPlayerSpecHasInspect(t *testing.T) {
+	s, ok := SpecFor("player")
+	if !ok {
+		t.Fatal("no player spec")
+	}
+	found := false
+	for _, o := range s.Args[1].options {
+		if o == "inspect" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("player spec sub-verbs missing inspect: %v", s.Args[1].options)
 	}
 }

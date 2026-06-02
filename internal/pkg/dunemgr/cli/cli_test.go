@@ -56,6 +56,19 @@ func TestRunVersionPrintsVersion(t *testing.T) {
 	}
 }
 
+func TestHelpListsAllDispatcherVerbs(t *testing.T) {
+	var out bytes.Buffer
+	if err := Run(context.Background(), []string{"help"}, nil, &out, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	for _, verb := range []string{"admin", "avatar", "backup", "broadcast", "db", "host", "ini", "lifecycle", "player", "shutdown", "stats", "whisper"} {
+		if !strings.Contains(got, verb) {
+			t.Fatalf("help missing dispatcher verb %q", verb)
+		}
+	}
+}
+
 func TestServeRejectsUnknownFlag(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
