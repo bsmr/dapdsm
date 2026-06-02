@@ -1,13 +1,16 @@
 package command
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSpecsCoverAllDispatcherVerbs(t *testing.T) {
 	got := map[string]bool{}
 	for _, s := range Specs() {
 		got[s.Verb] = true
 	}
-	for _, v := range []string{"host", "lifecycle", "broadcast", "db", "backup", "shutdown"} {
+	for _, v := range []string{"host", "lifecycle", "broadcast", "db", "backup", "shutdown", "avatar", "admin"} {
 		if !got[v] {
 			t.Errorf("Specs() missing verb %q", v)
 		}
@@ -64,5 +67,43 @@ func TestCandidatesByPosition(t *testing.T) {
 	db, _ := SpecFor("db")
 	if got := db.Candidates(2, nil); got != nil { // exec's next slot is argFree
 		t.Errorf("db freeform slot = %v, want nil", got)
+	}
+}
+
+func TestAvatarSpecShape(t *testing.T) {
+	s, ok := SpecFor("avatar")
+	if !ok {
+		t.Fatal("no avatar spec")
+	}
+	if len(s.Args) != 4 {
+		t.Fatalf("want 4 arg slots, got %d", len(s.Args))
+	}
+	if s.Args[0].kind != argFixed {
+		t.Fatal("slot 0 should be the fixed sub-verb")
+	}
+	wantSubs := map[string]bool{"export": false, "list": false, "import": false, "transfer": false}
+	for _, o := range s.Args[0].options {
+		if _, ok := wantSubs[o]; ok {
+			wantSubs[o] = true
+		}
+	}
+	for sub, seen := range wantSubs {
+		if !seen {
+			t.Fatalf("sub-verb %q missing from spec options %v", sub, s.Args[0].options)
+		}
+	}
+	if s.Args[1].kind != argHost || s.Args[2].kind != argHost {
+		t.Fatal("slots 1 and 2 should be argHost (src/dst for transfer)")
+	}
+}
+
+func TestAvatarUsageString(t *testing.T) {
+	s, ok := SpecFor("avatar")
+	if !ok {
+		t.Fatal("no avatar spec")
+	}
+	got := s.Usage()
+	if !strings.Contains(got, "avatar") {
+		t.Fatalf("usage missing verb: %q", got)
 	}
 }

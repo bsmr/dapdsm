@@ -205,6 +205,7 @@ func (r *Runner) execWithVars(ctx context.Context, host, sql string, vars map[st
 	// Build psql argv: base flags, then one -v key=value per variable.
 	psqlArgs := []string{
 		"exec", "-i", "-n", t.Namespace, t.Pod, "--",
+		"env", funcomPGOptions,
 		"psql",
 		"-h", "127.0.0.1",
 		"-p", strconv.Itoa(t.Port),
