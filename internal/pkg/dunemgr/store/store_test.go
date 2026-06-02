@@ -13,7 +13,7 @@ func TestOpenCreatesAllBuckets(t *testing.T) {
 	}
 	defer s.Close()
 
-	wantBuckets := []string{"hosts", "audit", "backups", "schedules", "statuscache"}
+	wantBuckets := []string{"hosts", "audit", "backups", "schedules", "statuscache", "avatars"}
 	for _, b := range wantBuckets {
 		if !s.HasBucket(b) {
 			t.Errorf("missing bucket %q", b)

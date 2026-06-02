@@ -73,6 +73,20 @@ var specs = map[string]Spec{
 			{kind: argFree, name: "query"},
 		},
 	},
+	"avatar": {
+		Verb: "avatar", Summary: "Export / list / import / transfer a single player's avatar",
+		Args: []argSlot{
+			{kind: argFixed, options: []string{"export", "list", "import", "transfer"}, name: "sub"},
+			{kind: argHost, name: "host"},
+			// Slot 2 is the dst-host for `transfer` and the fls-id for the
+			// other sub-verbs. Marked argHost so `transfer` gets host
+			// completion on both hosts; on export/list/import the host hints
+			// on the fls slot are harmless and ignorable (cf. admin's catalog
+			// default on its name slot).
+			{kind: argHost, name: "host-or-fls"},
+			{kind: argFree, name: "args"},
+		},
+	},
 	"backup": {
 		Verb: "backup", Summary: "Create / list / restore BattleGroup DB backups",
 		Args: []argSlot{

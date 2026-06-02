@@ -25,6 +25,7 @@ type Handler func(ctx context.Context, c *core.Core, argv []string, stdout, stde
 // migrated; host-targeting verbs only (version/regen-token stay in cli).
 var table = map[string]Handler{
 	"admin":     adminCmd,
+	"avatar":    avatarCmd,
 	"backup":    backupCmd,
 	"broadcast": broadcastCmd,
 	"db":        dbCmd,

@@ -1,5 +1,5 @@
 // Package store wraps a bbolt database for dunemgr's persistent
-// state. Buckets: hosts, audit, backups, schedules, statuscache.
+// state. Buckets: hosts, audit, backups, schedules, statuscache, avatars.
 package store
 
 import (
@@ -13,7 +13,7 @@ import (
 
 // allBuckets lists every top-level bucket. Order is stable so
 // tests can iterate.
-var allBuckets = []string{"hosts", "audit", "backups", "schedules", "statuscache"}
+var allBuckets = []string{"hosts", "audit", "backups", "schedules", "statuscache", "avatars"}
 
 // Store wraps a bbolt.DB.
 type Store struct {

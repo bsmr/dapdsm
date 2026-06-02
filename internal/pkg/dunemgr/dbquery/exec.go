@@ -9,6 +9,13 @@ import (
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
 )
 
+// funcomPGOptions sets the connection search_path so Funcom's own DB
+// functions (which reference dune.* tables UNQUALIFIED internally) resolve.
+// Passed via PGOPTIONS at connection time — no in-band SET statement, so it
+// does not pollute -tA output with a "SET" command tag. Harmless for our own
+// dune.-qualified queries.
+const funcomPGOptions = "PGOPTIONS=-c search_path=dune,public"
+
 // ExecResult captures one psql invocation's outcome. Stdout is the
 // raw `-tA -F "|"` output (pipe-separated, one row per line).
 type ExecResult struct {
@@ -52,6 +59,7 @@ func (r *Runner) execNoAudit(ctx context.Context, host, sql string) (*ExecResult
 
 	res, err := r.SSH.RunWithStdin(ctx, host, []byte(sql),
 		"kubectl", "exec", "-i", "-n", t.Namespace, t.Pod, "--",
+		"env", funcomPGOptions,
 		"psql",
 		"-h", "127.0.0.1",
 		"-p", strconv.Itoa(t.Port),
