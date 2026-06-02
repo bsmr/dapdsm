@@ -5,6 +5,7 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin"
 	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
+	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/gameini"
 )
 
 // argKind classifies a positional argument for completion + help.
@@ -42,6 +43,14 @@ var specs = map[string]Spec{
 		Verb: "host", Summary: "Manage the host pool",
 		Args: []argSlot{{kind: argFixed, options: []string{"add", "list", "rm", "probe"}, name: "sub"}},
 	},
+	"ini": {
+		Verb: "ini", Summary: "Read/set curated gameplay settings (vendor UserEngine.ini)",
+		Args: []argSlot{
+			{kind: argHost, name: "host"},
+			{kind: argFixed, options: []string{"list", "get", "set"}, name: "sub"},
+			{kind: argCatalog, catalogKey: "ini", name: "key"},
+		},
+	},
 	"lifecycle": {
 		Verb: "lifecycle", Summary: "Drive a BattleGroup lifecycle verb",
 		Args: []argSlot{
@@ -66,10 +75,10 @@ var specs = map[string]Spec{
 		},
 	},
 	"player": {
-		Verb: "player", Summary: "Look up a player by name / FLS-ID or retrieve live position",
+		Verb: "player", Summary: "Look up / inspect a player by name or FLS-ID",
 		Args: []argSlot{
 			{kind: argHost, name: "host"},
-			{kind: argFixed, options: []string{"search", "pos"}, name: "sub"},
+			{kind: argFixed, options: []string{"search", "pos", "inspect"}, name: "sub"},
 			{kind: argFree, name: "query"},
 		},
 	},
@@ -102,6 +111,18 @@ var specs = map[string]Spec{
 			{kind: argHost, name: "host"},
 			{kind: argFixed, options: []string{"schedule", "cancel", "status"}, name: "sub"},
 			{kind: argFree, name: "flags"},
+		},
+	},
+	"stats": {
+		Verb: "stats", Summary: "Show node telemetry (CPU / memory / disk / network)",
+		Args: []argSlot{{kind: argHost, name: "host"}},
+	},
+	"whisper": {
+		Verb: "whisper", Summary: "Send a private in-game chat message to one player",
+		Args: []argSlot{
+			{kind: argHost, name: "host"},
+			{kind: argFree, name: "fls-id"},
+			{kind: argFree, name: "message"},
 		},
 	},
 }
@@ -233,6 +254,8 @@ func catalogCandidates(defaultKey string, tokens []string) []string {
 		return admincatalog.SkillIDs()
 	case "vehicles":
 		return admincatalog.VehicleIDs()
+	case "ini":
+		return gameini.Keys()
 	default: // "items" or unknown
 		return admincatalog.ItemIDs()
 	}

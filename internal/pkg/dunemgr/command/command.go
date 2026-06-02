@@ -30,9 +30,12 @@ var table = map[string]Handler{
 	"broadcast": broadcastCmd,
 	"db":        dbCmd,
 	"host":      hostCmd,
+	"ini":       iniCmd,
 	"lifecycle": lifecycleCmd,
 	"player":    playerCmd,
 	"shutdown":  shutdownCmd,
+	"stats":     statsCmd,
+	"whisper":   whisperCmd,
 }
 
 // Dispatch looks up argv[0] and invokes its handler with the shared core.

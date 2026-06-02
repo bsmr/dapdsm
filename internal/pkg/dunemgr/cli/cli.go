@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"text/tabwriter"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
@@ -56,9 +57,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	}
 }
 
-func printUsage(w io.Writer) { fmt.Fprint(w, usage) }
-
-const usage = `dunemgr — operate Dune Awakening private dedicated servers.
+const usageHeader = `dunemgr — operate Dune Awakening private dedicated servers.
 
 Usage:
   dunemgr [command] [arguments]
@@ -66,17 +65,25 @@ Usage:
 With no command, dunemgr starts the local web UI + status poller.
 
 Commands:
-  (none)              Start the web UI on the configured bind address.
-  help                Print this message.
-  version             Print build identity.
-  regen-token         Rotate the web UI bearer token.
-  host                Manage the host pool (list|add|rm|probe).
-  lifecycle           Drive a BattleGroup lifecycle verb (start|stop|restart|update).
-  backup              Create / list / restore BattleGroup DB backups.
-  broadcast           Publish an in-game notice or shutdown announcement.
-  db                  Run a read-only DB query (exec|columns|slow).
-  shutdown            Schedule / cancel / inspect a shutdown countdown.
-  tui                 Launch the full-screen terminal UI (status + command bar).
+`
 
+const usageFooter = `
 The web UI token is stored under the config dir; see --print-token on start.
 `
+
+func printUsage(w io.Writer) {
+	fmt.Fprint(w, usageHeader)
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	// CLI-only verbs (static).
+	fmt.Fprintln(tw, "  (none)\tStart the web UI on the configured bind address.")
+	fmt.Fprintln(tw, "  help\tPrint this message.")
+	fmt.Fprintln(tw, "  version\tPrint build identity.")
+	fmt.Fprintln(tw, "  regen-token\tRotate the web UI bearer token.")
+	fmt.Fprintln(tw, "  tui\tLaunch the full-screen terminal UI (status + command bar).")
+	// Dispatcher verbs: generated from command.Specs() so this list never goes stale.
+	for _, s := range command.Specs() {
+		fmt.Fprintf(tw, "  %s\t%s\n", s.Verb, s.Summary)
+	}
+	_ = tw.Flush()
+	fmt.Fprint(w, usageFooter)
+}
