@@ -54,3 +54,27 @@ func TestGiveSpecRegistered(t *testing.T) {
 		t.Fatalf("give spec malformed: %+v", s)
 	}
 }
+
+func TestGiveSpecHasXPVerbs(t *testing.T) {
+	s, ok := SpecFor("give")
+	if !ok {
+		t.Fatal("give spec missing")
+	}
+	var opts []string
+	for _, a := range s.Args {
+		if a.name == "sub" {
+			opts = a.options
+		}
+	}
+	for _, want := range []string{"currency", "item", "skillpoints", "xp", "charxp"} {
+		found := false
+		for _, o := range opts {
+			if o == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("give sub options missing %q: %v", want, opts)
+		}
+	}
+}

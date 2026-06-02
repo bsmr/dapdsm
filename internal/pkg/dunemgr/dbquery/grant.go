@@ -133,15 +133,14 @@ COMMIT;`
 	return nil
 }
 
-// GrantSkillpoints increments TotalSkillPoints and UnspentSkillPoints in the
-// character's FLevelComponent by amount (the ng_da_webadmin recipe). Returns the
-// new unspent total. DB-authoritative only when the player is offline.
+// GrantSkillpoints adds amount to UnspentSkillPoints only (additive) in the
+// character's FLevelComponent, returning the new unspent total. The 0.1.8 Total
+// bump is intentionally dropped so the offline (DB) and online (MQ
+// SkillsSetUnspentSkillPoints) paths touch the same field. DB-authoritative only
+// when the player is offline; gating is the caller's responsibility.
 func (r *Runner) GrantSkillpoints(ctx context.Context, host, fls string, amount int64) (int64, error) {
 	const sql = `UPDATE dune.fgl_entities fe
-SET components = jsonb_set(
-      jsonb_set(fe.components, '{FLevelComponent,1,TotalSkillPoints}',
-        to_jsonb(COALESCE((fe.components #>> '{FLevelComponent,1,TotalSkillPoints}')::bigint,0) + :amount::bigint)),
-      '{FLevelComponent,1,UnspentSkillPoints}',
+SET components = jsonb_set(fe.components, '{FLevelComponent,1,UnspentSkillPoints}',
       to_jsonb(COALESCE((fe.components #>> '{FLevelComponent,1,UnspentSkillPoints}')::bigint,0) + :amount::bigint))
 FROM dune.actor_fgl_entities afe
 JOIN dune.player_state ps ON ps.player_pawn_id = afe.actor_id
@@ -161,6 +160,74 @@ RETURNING (fe.components #>> '{FLevelComponent,1,UnspentSkillPoints}')::bigint;`
 	n, err := strconv.ParseInt(out, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("grant skillpoints: parse unspent %q: %w", out, err)
+	}
+	return n, nil
+}
+
+// GrantTrackXP adds amount to a specialization track's xp_amount (clamped to
+// [0, 44182]), inserting the track row if absent — mirroring dune-admin's
+// cmdAwardXP. Returns the new xp_amount. DB-authoritative only when offline.
+func (r *Runner) GrantTrackXP(ctx context.Context, host, fls, track string, amount int64) (int64, error) {
+	const sql = onErrorStop + `WITH pid AS (
+  SELECT ps.player_controller_id AS player_id
+  FROM dune.player_state ps
+  JOIN dune.accounts a ON a.id = ps.account_id
+  WHERE a."user"::text = :'fls' LIMIT 1
+), upd AS (
+  UPDATE dune.specialization_tracks t
+  SET xp_amount = GREATEST(LEAST(t.xp_amount + :amount::integer, 44182), 0)
+  FROM pid
+  WHERE t.player_id = pid.player_id AND t.track_type::text = :'track'
+  RETURNING t.xp_amount
+), ins AS (
+  INSERT INTO dune.specialization_tracks (player_id, track_type, xp_amount, level)
+  SELECT pid.player_id, :'track'::dune.specializationtracktype,
+         GREATEST(LEAST(:amount::integer, 44182), 0), 0::real
+  FROM pid
+  WHERE NOT EXISTS (SELECT 1 FROM upd)
+  RETURNING xp_amount
+)
+SELECT xp_amount FROM upd UNION ALL SELECT xp_amount FROM ins;`
+	res, err := r.execWithVars(ctx, host, sql, map[string]string{
+		"fls": fls, "track": track, "amount": strconv.FormatInt(amount, 10),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("grant track xp: %w", err)
+	}
+	out := strings.TrimSpace(res.Stdout)
+	if out == "" {
+		return 0, fmt.Errorf("grant track xp: nothing updated (unknown fls or controller)")
+	}
+	n, err := strconv.ParseInt(out, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("grant track xp: parse %q: %w", out, err)
+	}
+	return n, nil
+}
+
+// UnspentSkillpoints reads the character's current UnspentSkillPoints (0 if the
+// field is absent). Used by the online give-skillpoints path to compute the
+// absolute MQ target (base + delta). The base may lag the live game (the engine
+// writes FLevelComponent back on logout/sync).
+func (r *Runner) UnspentSkillpoints(ctx context.Context, host, fls string) (int64, error) {
+	const sql = `SELECT COALESCE((fe.components #>> '{FLevelComponent,1,UnspentSkillPoints}')::bigint, 0)
+FROM dune.fgl_entities fe
+JOIN dune.actor_fgl_entities afe ON afe.entity_id = fe.entity_id
+JOIN dune.player_state ps ON ps.player_pawn_id = afe.actor_id
+JOIN dune.accounts a ON a.id = ps.account_id
+WHERE afe.slot_name = 'DuneCharacter' AND a."user"::text = :'fls'
+LIMIT 1;`
+	res, err := r.execWithVars(ctx, host, sql, map[string]string{"fls": fls})
+	if err != nil {
+		return 0, fmt.Errorf("read unspent skillpoints: %w", err)
+	}
+	out := strings.TrimSpace(res.Stdout)
+	if out == "" {
+		return 0, fmt.Errorf("read unspent skillpoints: unknown fls")
+	}
+	n, err := strconv.ParseInt(out, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("read unspent skillpoints: parse %q: %w", out, err)
 	}
 	return n, nil
 }

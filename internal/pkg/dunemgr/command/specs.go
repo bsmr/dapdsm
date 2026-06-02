@@ -76,10 +76,10 @@ var specs = map[string]Spec{
 		},
 	},
 	"give": {
-		Verb: "give", Summary: "Grant currency/item/skillpoints to a player (presence-aware)",
+		Verb: "give", Summary: "Grant currency/item/skillpoints/xp/charxp to a player (presence-aware)",
 		Args: []argSlot{
 			{kind: argHost, name: "host"},
-			{kind: argFixed, options: []string{"currency", "item", "skillpoints"}, name: "sub"},
+			{kind: argFixed, options: []string{"currency", "item", "skillpoints", "xp", "charxp"}, name: "sub"},
 			{kind: argFree, name: "args"},
 		},
 	},

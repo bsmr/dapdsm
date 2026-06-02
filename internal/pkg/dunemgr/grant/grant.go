@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
+	"strings"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
@@ -32,13 +34,43 @@ const (
 	VerbCurrency    Verb = "currency"
 	VerbItem        Verb = "item"
 	VerbSkillpoints Verb = "skillpoints"
+	VerbXP          Verb = "xp"
+	VerbCharXP      Verb = "charxp"
 )
 
 const (
 	maxSkillpoints = 1000
 	maxItemCount   = 1000
 	maxCurrency    = 1_000_000_000
+	maxTrackXP     = 44182
+	maxCharXP      = 344440
 )
+
+// validTracks is the allowlist of dune.specializationtracktype values give-xp
+// accepts. Only "Combat" is live-proven (admin xp hardcodes it); the rest are
+// inferred from the enum and accepted on the operator's judgement. Source:
+// submodules/dune-admin enum usage @4e09a92.
+var validTracks = []string{
+	"BeneGesserit", "Combat", "Melee", "Mentat",
+	"Planetologist", "Swordmaster", "Trooper", "Vehicle",
+}
+
+// Tracks returns the sorted track allowlist (for usage text).
+func Tracks() []string {
+	out := append([]string(nil), validTracks...)
+	sort.Strings(out)
+	return out
+}
+
+// CanonicalTrack maps a case-insensitive track name to its canonical form.
+func CanonicalTrack(s string) (string, bool) {
+	for _, t := range validTracks {
+		if strings.EqualFold(t, s) {
+			return t, true
+		}
+	}
+	return "", false
+}
 
 var itemNameRE = regexp.MustCompile(`^[A-Za-z0-9_./-]+$`)
 
@@ -54,6 +86,8 @@ type Req struct {
 	Durability float64
 	Amount     int64
 	Force      bool
+	Track      string // VerbXP
+	XP         int64  // VerbXP, VerbCharXP
 }
 
 // Plan is the resolved, not-yet-applied action (the --check view).
@@ -98,6 +132,17 @@ func (g *Granter) validate(req Req) error {
 		if req.Amount <= 0 || req.Amount > maxSkillpoints {
 			return fmt.Errorf("grant skillpoints: amount %d out of range (1..%d)", req.Amount, maxSkillpoints)
 		}
+	case VerbXP:
+		if _, ok := CanonicalTrack(req.Track); !ok {
+			return fmt.Errorf("grant xp: unknown track %q (want one of %v)", req.Track, Tracks())
+		}
+		if req.XP <= 0 || req.XP > maxTrackXP {
+			return fmt.Errorf("grant xp: amount %d out of range (1..%d)", req.XP, maxTrackXP)
+		}
+	case VerbCharXP:
+		if req.XP <= 0 || req.XP > maxCharXP {
+			return fmt.Errorf("grant charxp: amount %d out of range (1..%d)", req.XP, maxCharXP)
+		}
 	default:
 		return fmt.Errorf("grant: unknown verb %q", req.Verb)
 	}
@@ -130,11 +175,30 @@ func (g *Granter) Plan(ctx context.Context, host string, req Req) (Plan, error) 
 		}
 		p.Summary = fmt.Sprintf("currency %d delta %+d (DB)", req.CurrencyID, req.Delta)
 	case VerbSkillpoints:
+		if offline {
+			p.Backend = BackendDB
+			p.Summary = fmt.Sprintf("skillpoints +%d → Unspent (offline, DB)", req.Amount)
+		} else {
+			if !req.Force {
+				return Plan{}, fmt.Errorf("grant skillpoints: player online; the online path sets Unspent from a possibly-stale DB read — re-run with --force to apply anyway")
+			}
+			p.Backend = BackendMQ
+			p.Summary = fmt.Sprintf("skillpoints +%d → set Unspent base+%d (online, MQ; base may be stale)", req.Amount, req.Amount)
+		}
+	case VerbXP:
+		if offline {
+			p.Backend = BackendDB
+			p.Summary = fmt.Sprintf("track xp +%d → %s (offline, DB)", req.XP, req.Track)
+		} else {
+			p.Backend = BackendMQ
+			p.Summary = fmt.Sprintf("AwardXP +%d → %s (online, MQ)", req.XP, req.Track)
+		}
+	case VerbCharXP:
 		p.Backend = BackendDB
 		if !offline && !req.Force {
-			return Plan{}, fmt.Errorf("grant skillpoints: player online; the running game owns character state and may overwrite a DB write — re-run with --force to apply anyway")
+			return Plan{}, fmt.Errorf("grant charxp: character XP has no live path; player online — re-run with --force to write the DB anyway")
 		}
-		p.Summary = fmt.Sprintf("skillpoints +%d (DB)", req.Amount)
+		p.Summary = fmt.Sprintf("char xp +%d → recompute level/SP/intel (offline, DB)", req.XP)
 	}
 	return p, nil
 }
@@ -155,13 +219,27 @@ func (g *Granter) Apply(ctx context.Context, operator, host string, req Req) (Re
 		}
 		return Result{OK: true, Detail: fmt.Sprintf("new balance %d", bal)}, nil
 	case VerbSkillpoints:
-		unspent, err := g.DB.GrantSkillpoints(ctx, host, req.FLS, req.Amount)
-		g.audit(operator, host, "give.skillpoints",
-			fmt.Sprintf("fls=%s amount=%d backend=db", req.FLS, req.Amount), err)
+		if p.Backend == BackendDB {
+			unspent, err := g.DB.GrantSkillpoints(ctx, host, req.FLS, req.Amount)
+			g.audit(operator, host, "give.skillpoints",
+				fmt.Sprintf("fls=%s amount=%d backend=db", req.FLS, req.Amount), err)
+			if err != nil {
+				return Result{}, err
+			}
+			return Result{OK: true, Detail: fmt.Sprintf("unspent now %d", unspent)}, nil
+		}
+		base, err := g.DB.UnspentSkillpoints(ctx, host, req.FLS)
 		if err != nil {
 			return Result{}, err
 		}
-		return Result{OK: true, Detail: fmt.Sprintf("unspent now %d", unspent)}, nil
+		target := base + req.Amount
+		inner := mq.BuildSkillpointsCommand(req.FLS, target)
+		subject := fmt.Sprintf("fls=%s amount=%d base=%d set=%d backend=mq", req.FLS, req.Amount, base, target)
+		res, err := g.MQ.PublishInner(ctx, operator, host, "give.skillpoints", subject, inner, "skillpoints")
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{OK: res.OK, Detail: fmt.Sprintf("set unspent %d (base %d + %d; base may be stale)", target, base, req.Amount)}, nil
 	case VerbItem:
 		if p.Backend == BackendDB {
 			id, err := g.DB.GrantItemDB(ctx, host, req.FLS, req.Item, req.Count, req.Quality)
@@ -184,6 +262,35 @@ func (g *Granter) Apply(ctx context.Context, operator, host string, req Req) (Re
 			return Result{}, err
 		}
 		return Result{OK: res.OK, Detail: res.RawOutput}, nil
+	case VerbXP:
+		if p.Backend == BackendDB {
+			n, err := g.DB.GrantTrackXP(ctx, host, req.FLS, req.Track, req.XP)
+			g.audit(operator, host, "give.xp",
+				fmt.Sprintf("fls=%s track=%s amount=%d backend=db", req.FLS, req.Track, req.XP), err)
+			if err != nil {
+				return Result{}, err
+			}
+			return Result{OK: true, Detail: fmt.Sprintf("%s xp now %d", req.Track, n)}, nil
+		}
+		inner := mq.BuildAwardXPCommand(req.FLS, req.Track, req.XP)
+		subject := fmt.Sprintf("fls=%s track=%s amount=%d backend=mq", req.FLS, req.Track, req.XP)
+		res, err := g.MQ.PublishInner(ctx, operator, host, "give.xp", subject, inner, "awardxp")
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{OK: res.OK, Detail: res.RawOutput}, nil
+	case VerbCharXP:
+		out, err := g.DB.GrantCharXP(ctx, host, req.FLS, req.XP)
+		g.audit(operator, host, "give.charxp",
+			fmt.Sprintf("fls=%s amount=%d backend=db", req.FLS, req.XP), err)
+		if err != nil {
+			return Result{}, err
+		}
+		capped := ""
+		if out.Capped {
+			capped = " (capped)"
+		}
+		return Result{OK: true, Detail: fmt.Sprintf("level %d, unspent %d%s", out.NewLevel, out.NewUnspent, capped)}, nil
 	}
 	return Result{}, fmt.Errorf("grant: unknown verb %q", req.Verb)
 }
