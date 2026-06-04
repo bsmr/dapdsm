@@ -18,7 +18,7 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 	if len(args) < 2 {
 		fmt.Fprintln(stderr, "usage: dunemgr player <host> search [<query>] [--limit N]   (empty query lists all)")
 		fmt.Fprintln(stderr, "       dunemgr player <host> pos <name|fls> [--id]")
-		fmt.Fprintln(stderr, "       dunemgr player <host> inspect <name|fls> [--top N] [--raw] [--id]")
+		fmt.Fprintln(stderr, "       dunemgr player <host> inspect <name|fls> [--inv <type>] [--top N] [--raw] [--id]")
 		return fmt.Errorf("player: usage: %w", ErrUsage)
 	}
 	host, sub, rest := args[0], args[1], args[2:]
@@ -53,13 +53,14 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 		return nil
 	case "inspect":
 		if len(rest) < 1 {
-			fmt.Fprintln(stderr, "usage: dunemgr player <host> inspect <name|fls> [--top N] [--raw] [--id]")
+			fmt.Fprintln(stderr, "usage: dunemgr player <host> inspect <name|fls> [--inv <type>] [--top N] [--raw] [--id]")
 			return fmt.Errorf("player inspect: usage: %w", ErrUsage)
 		}
 		ref := rest[0]
 		top := 10
 		raw := false
 		useID := false
+		invType := -1
 		for i := 1; i < len(rest); i++ {
 			switch rest[i] {
 			case "--raw":
@@ -73,11 +74,26 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 					}
 					i++
 				}
+			case "--inv":
+				if i+1 < len(rest) {
+					if n, e := strconv.Atoi(rest[i+1]); e == nil {
+						invType = n
+					}
+					i++
+				}
 			}
 		}
 		flsID, err := resolvePlayerArg(ctx, r, host, ref, useID, stderr)
 		if err != nil {
 			return err
+		}
+		if invType >= 0 {
+			rows, err := r.InventoryItems(ctx, host, flsID, invType)
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(stdout, FormatInventoryItems(invType, rows))
+			return nil
 		}
 		d, err := r.PlayerInspect(ctx, host, flsID, top, raw)
 		if err != nil {

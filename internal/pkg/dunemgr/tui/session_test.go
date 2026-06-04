@@ -41,19 +41,24 @@ func TestCommandBarSession(t *testing.T) {
 	apply(pollMsg{host: "vm-b", kind: pollBG, bgState: "DEGRADED", ready: 1, total: 2})
 	apply(pollMsg{host: "vm-b", kind: pollHealth, reachable: true})
 
-	if m.selected != 0 {
-		t.Fatalf("initial selection = %d, want 0", m.selected)
+	if got := m.selectedHost(); got != "vm-a" {
+		t.Fatalf("initial selectedHost = %q, want vm-a", got)
 	}
 	if got := m.statuses["vm-a"]; got.bgState != "RUNNING" || got.ready != 2 || !got.reachable {
 		t.Fatalf("vm-a status not folded: %+v", got)
 	}
-	wantView("1 initial", "vm-a", "RUNNING", "2/2", "vm-b", "DEGRADED", "1/2", "reachable")
+	wantView("1 initial", "vm-a", "RUNNING", "2/2", "vm-b", "DEGRADED", "1/2")
 
-	// Step 2: arrow-down selects vm-b; the detail pane follows the selection.
+	// Step 2: move cursor down to vm-b (index 1). With the cursor-is-selection
+	// fix, selectedHost() reflects the new cursor immediately — no Right needed.
+	// We also verify that descending (Right) and ascending (Left) still work.
+	m.nav.counts[levelHosts] = 2
 	apply(tea.KeyMsg{Type: tea.KeyDown})
-	if m.selected != 1 {
-		t.Fatalf("after down: selection = %d, want 1", m.selected)
+	if got := m.selectedHost(); got != "vm-b" {
+		t.Fatalf("after down: selectedHost=%q want vm-b (cursor is selection, no lag)", got)
 	}
+	apply(tea.KeyMsg{Type: tea.KeyRight}) // descend into players (verifies descend still works)
+	apply(tea.KeyMsg{Type: tea.KeyLeft})  // ascend back to hosts
 
 	// Step 3: ':' enters command mode; typing shows a live suggestion line.
 	keys(":")
@@ -91,16 +96,19 @@ func TestCommandBarSession(t *testing.T) {
 	if m.input.Value() != "" {
 		t.Errorf("input not cleared after Enter: %q", m.input.Value())
 	}
-	// The rendered pane shows only the first outputWindow lines; check the full
+	// The rendered pane shows only the first contentWindow lines; check the full
 	// output buffer directly for items that may be scrolled out of view.
-	wantView("6 help", "── result ──", "lifecycle <host>", "backup")
-	for _, want := range []string{"lifecycle <host>", "backup", "shutdown", "help [verb]"} {
+	wantView("6 help", "commands (Tab to complete):")
+	for _, want := range []string{"lifecycle <host>", "item <host>", "ini <host>", "backup", "shutdown", "help [verb]"} {
 		if !strings.Contains(m.output, want) {
 			t.Errorf("[6 help] output buffer missing %q", want)
 		}
 	}
 
-	// Step 7: a live action frame appends to the event log and the detail pane.
+	// Step 7: a live action frame appends to the event log.
+	// The nav content pane shows renderList (not events) when output is empty, so
+	// we verify the event log directly rather than through View().
+	m.output = ""
 	apply(pollMsg{host: "vm-b", kind: pollAction, action: "restart", result: "ok"})
 	if len(m.events) == 0 {
 		t.Fatal("action frame did not append to the event log")
@@ -108,7 +116,9 @@ func TestCommandBarSession(t *testing.T) {
 	if got := m.statuses["vm-b"].lastAction; !strings.Contains(got, "restart") {
 		t.Errorf("vm-b lastAction = %q, want it to mention restart", got)
 	}
-	wantView("7 action", "restart → ok")
+	if !strings.Contains(m.events[len(m.events)-1], "restart → ok") {
+		t.Errorf("[7 action] event log missing restart → ok: %v", m.events)
+	}
 
 	// Step 8: ':player <host> search <query>' enters command mode, types the full
 	// command, and verifies the bar is in command mode with the expected content

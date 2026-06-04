@@ -153,12 +153,23 @@ func TestValidationRejectsBadCaps(t *testing.T) {
 		{Verb: VerbSkillpoints, FLS: "ABCD", Amount: 1001},
 		{Verb: VerbItem, FLS: "ABCD", Item: "x", Count: 0},
 		{Verb: VerbItem, FLS: "ABCD", Item: "bad name!", Count: 1},
-		{Verb: VerbItem, FLS: "ABCD", Item: "ok", Count: 1001},
+		{Verb: VerbItem, FLS: "ABCD", Item: "ok", Count: maxItemCount + 1},
 	}
 	for _, r := range bad {
 		if _, err := g.Plan(context.Background(), "h", r); err == nil {
 			t.Errorf("expected validation error for %+v", r)
 		}
+	}
+}
+
+// TestValidationAcceptsHighItemCount guards the relaxed give-item cap: a count
+// well above the old flat 1000 (e.g. a 25000 Solari stack) must validate, since
+// the DB enforces no per-template stack max (see reference: merge_inventory_items
+// never clamps). maxItemCount is a self-imposed, tunable blast-radius guard.
+func TestValidationAcceptsHighItemCount(t *testing.T) {
+	g, _ := mustGranter(t, true)
+	if _, err := g.Plan(context.Background(), "h", Req{Verb: VerbItem, FLS: "ABCD", Item: "SolarisCoin", Count: 25000}); err != nil {
+		t.Fatalf("a 25000 item count must validate under the relaxed cap, got %v", err)
 	}
 }
 

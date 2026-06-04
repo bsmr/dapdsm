@@ -20,24 +20,25 @@ import (
 // equal under errors.Is.
 var ErrUsage = command.ErrUsage
 
-// Run dispatches args[0]. With no args it starts the server.
+// Run dispatches args[0]. With no args it launches the TUI.
+//
+// The web UI is disabled as of 0.1.12: the serve, --print-token, and
+// regen-token verbs are deliberately not wired here, so they fall through to
+// the default branch and are rejected as unknown verbs. The serveCmd and
+// regenTokenCmd functions plus the server/ package and token code remain in the
+// tree, unreferenced, so a later cycle can re-enable the web UI by re-adding
+// these cases.
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	_ = stdin // reserved for future subcommands that read stdin
 	if len(args) == 0 {
-		return serveCmd(ctx, nil, stdout, stderr)
+		return tuiCmd(ctx, nil, stdout, stderr)
 	}
 	switch args[0] {
 	case "help", "-h", "--help":
 		printUsage(stdout)
 		return nil
-	case "serve":
-		return serveCmd(ctx, args[1:], stdout, stderr)
-	case "--print-token":
-		return serveCmd(ctx, []string{"--print-token"}, stdout, stderr)
 	case "version", "-v", "--version":
 		return versionCmd(ctx, args[1:], stdout, stderr)
-	case "regen-token":
-		return regenTokenCmd(ctx, args[1:], stdout, stderr)
 	case "tui":
 		return tuiCmd(ctx, args[1:], stdout, stderr)
 	default:
@@ -62,28 +63,22 @@ const usageHeader = `dunemgr — operate Dune Awakening private dedicated server
 Usage:
   dunemgr [command] [arguments]
 
-With no command, dunemgr starts the local web UI + status poller.
+With no command, dunemgr launches the terminal UI (TUI).
 
 Commands:
-`
-
-const usageFooter = `
-The web UI token is stored under the config dir; see --print-token on start.
 `
 
 func printUsage(w io.Writer) {
 	fmt.Fprint(w, usageHeader)
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	// CLI-only verbs (static).
-	fmt.Fprintln(tw, "  (none)\tStart the web UI on the configured bind address.")
+	fmt.Fprintln(tw, "  (none)\tLaunch the full-screen terminal UI (status + command bar).")
 	fmt.Fprintln(tw, "  help\tPrint this message.")
 	fmt.Fprintln(tw, "  version\tPrint build identity.")
-	fmt.Fprintln(tw, "  regen-token\tRotate the web UI bearer token.")
 	fmt.Fprintln(tw, "  tui\tLaunch the full-screen terminal UI (status + command bar).")
 	// Dispatcher verbs: generated from command.Specs() so this list never goes stale.
 	for _, s := range command.Specs() {
 		fmt.Fprintf(tw, "  %s\t%s\n", s.Verb, s.Summary)
 	}
 	_ = tw.Flush()
-	fmt.Fprint(w, usageFooter)
 }

@@ -5,18 +5,12 @@ import (
 	"testing"
 )
 
-// TestAdminSpec_ArgCatalog_ItemVerb verifies that the admin name-arg slot for
-// verb "item" returns item ids from the catalog.
-func TestAdminSpec_ArgCatalog_ItemVerb(t *testing.T) {
-	s, ok := SpecFor("admin")
-	if !ok {
-		t.Fatal("SpecFor(admin) not found")
-	}
-	// admin arg layout: host(0) verb(1) player(2) name(3)
-	// tokens is the full prefix-token list: [outerVerb, host, adminSubVerb, playerID]
-	cands := s.Candidates(3, nil, "admin", "vm-a", "item", "player-x")
+// TestCatalogCandidates_Items verifies that catalogCandidates("items") returns
+// item ids from the vendored catalog.
+func TestCatalogCandidates_Items(t *testing.T) {
+	cands := catalogCandidates("items")
 	if len(cands) == 0 {
-		t.Fatal("Candidates for admin name slot with verb=item: got empty slice")
+		t.Fatal("catalogCandidates(items): got empty slice")
 	}
 	// T6_Augment_Acuracy1 is the first item in the vendored catalog.
 	found := false
@@ -27,17 +21,16 @@ func TestAdminSpec_ArgCatalog_ItemVerb(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("item catalog candidates do not contain T6_Augment_Acuracy1 (first 5: %v)", cands[:min5(cands)])
+		t.Errorf("item catalog does not contain T6_Augment_Acuracy1 (first 5: %v)", cands[:min5(cands)])
 	}
 }
 
-// TestAdminSpec_ArgCatalog_SkillVerb verifies that verb "skill" returns skill
-// module ids.
-func TestAdminSpec_ArgCatalog_SkillVerb(t *testing.T) {
-	s, _ := SpecFor("admin")
-	cands := s.Candidates(3, nil, "admin", "vm-a", "skill", "player-x")
+// TestCatalogCandidates_Skills verifies that catalogCandidates("skills") returns
+// skill module ids.
+func TestCatalogCandidates_Skills(t *testing.T) {
+	cands := catalogCandidates("skills")
 	if len(cands) == 0 {
-		t.Fatal("Candidates for admin name slot with verb=skill: got empty slice")
+		t.Fatal("catalogCandidates(skills): got empty slice")
 	}
 	// Skills.Ability.Hypersprint is in the vendored catalog.
 	found := false
@@ -48,17 +41,16 @@ func TestAdminSpec_ArgCatalog_SkillVerb(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("skill catalog candidates do not contain Skills.Ability.Hypersprint (first 5: %v)", cands[:min5(cands)])
+		t.Errorf("skill catalog does not contain Skills.Ability.Hypersprint (first 5: %v)", cands[:min5(cands)])
 	}
 }
 
-// TestAdminSpec_ArgCatalog_VehicleVerb verifies that verb "vehicle" returns
-// vehicle ids.
-func TestAdminSpec_ArgCatalog_VehicleVerb(t *testing.T) {
-	s, _ := SpecFor("admin")
-	cands := s.Candidates(3, nil, "admin", "vm-a", "vehicle", "player-x")
+// TestCatalogCandidates_Vehicles verifies that catalogCandidates("vehicles")
+// returns vehicle ids.
+func TestCatalogCandidates_Vehicles(t *testing.T) {
+	cands := catalogCandidates("vehicles")
 	if len(cands) == 0 {
-		t.Fatal("Candidates for admin name slot with verb=vehicle: got empty slice")
+		t.Fatal("catalogCandidates(vehicles): got empty slice")
 	}
 	found := false
 	for _, c := range cands {
@@ -68,30 +60,31 @@ func TestAdminSpec_ArgCatalog_VehicleVerb(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("vehicle catalog candidates do not contain Sandbike (got: %v)", cands)
+		t.Errorf("vehicle catalog does not contain Sandbike (got: %v)", cands)
 	}
 }
 
-// TestAdminSpec_ArgCatalog_NoTokens verifies that without typed tokens the
-// catalog slot still returns the default (items) catalog.
-func TestAdminSpec_ArgCatalog_NoTokens(t *testing.T) {
-	s, _ := SpecFor("admin")
-	cands := s.Candidates(3, nil) // no tokens — default to items
+// TestCatalogCandidates_Unknown verifies that an unknown key defaults to items.
+func TestCatalogCandidates_Unknown(t *testing.T) {
+	cands := catalogCandidates("unknown-key")
 	if len(cands) == 0 {
-		t.Fatal("Candidates for admin name slot with no tokens: got empty slice")
+		t.Fatal("catalogCandidates(unknown): expected items fallback, got empty slice")
 	}
 }
 
-// TestAdminSpec_ArgCatalog_UnknownVerb verifies that a non-catalog verb still
-// returns a non-nil (defaulting to items) list from the name slot.
-func TestAdminSpec_ArgCatalog_UnknownVerb(t *testing.T) {
-	s, _ := SpecFor("admin")
-	// "kick" has no catalog name; default to items.
-	cands := s.Candidates(3, nil, "admin", "vm-a", "kick", "player-x")
-	// kick has no name arg in practice, but the slot is defined as argCatalog;
-	// it should return items (the default catalog key) not nil.
-	if cands == nil {
-		t.Error("expected non-nil candidates for argCatalog slot, even for kick")
+// TestAdminSpec_ArgCatalog_ItemsViaSubArgs verifies that the admin name-arg slot
+// at position 3 returns the items catalog when the sub-verb is "item".
+func TestAdminSpec_ArgCatalog_ItemsViaSubArgs(t *testing.T) {
+	s, ok := SpecFor("admin")
+	if !ok {
+		t.Fatal("SpecFor(admin) not found")
+	}
+	// SubArgs["item"] = [{argPlayer, "player-id"}, {argCatalog, "items", "name"}]
+	// slotAt(3, tokens) resolves relative to the sub-verb slot (1), so pos 3
+	// maps to SubArgs["item"][1] = items catalog.
+	cands := s.Candidates(3, nil, "admin", "vm-a", "item")
+	if len(cands) == 0 {
+		t.Fatal("Candidates for admin item name slot: got empty slice")
 	}
 }
 
@@ -112,13 +105,28 @@ func min5(s []string) int {
 	return 5
 }
 
-// TestSuggestAdminCatalogFiltered verifies that the suggest function in the
-// tui package filters catalog ids by prefix when an admin command is typed.
-// This test is in the command package; the tui-side test is in tui/complete_test.go.
+// TestAdminSubArgsCatalogSelection proves that the admin catalog resolves via
+// SubArgs: skill/vehicle expose catalog slots, kick exposes none.
+func TestAdminSubArgsCatalogSelection(t *testing.T) {
+	a, _ := SpecFor("admin")
+	if got := a.Candidates(3, nil, "admin", "vm-a", "skill"); len(got) == 0 {
+		t.Error("admin skill should expose the skills catalog at slot 3")
+	}
+	if got := a.Candidates(3, nil, "admin", "vm-a", "vehicle"); len(got) == 0 {
+		t.Error("admin vehicle should expose the vehicles catalog at slot 3")
+	}
+	if !a.IsPlayerPos(2, "admin", "vm-a", "kick") {
+		t.Error("admin player-id slot (idx 2) should be argPlayer for every verb")
+	}
+	if a.IsCatalogPos(3, "admin", "vm-a", "kick") {
+		t.Error("admin kick must not expose a catalog slot")
+	}
+}
+
+// TestSuggestAdminCatalogFiltered verifies prefix-filtering of catalog ids.
+// Tests catalogCandidates in isolation; end-to-end coverage is in TestAdminSubArgsCatalogSelection.
 func TestSuggestAdminCatalog_PrefixFilter(t *testing.T) {
-	s, _ := SpecFor("admin")
-	// tokens is the full prefix-token list: [outerVerb, host, adminSubVerb, playerID]
-	cands := s.Candidates(3, nil, "admin", "vm-a", "item", "player-x")
+	cands := catalogCandidates("items")
 	// Filter by prefix "T6_Augment_Ac" — should match T6_Augment_Acuracy1
 	prefix := "T6_Augment_Ac"
 	var filtered []string

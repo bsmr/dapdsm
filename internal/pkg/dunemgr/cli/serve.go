@@ -15,7 +15,11 @@ import (
 )
 
 // serveCmd starts the dunemgr web UI + background status poller and blocks
-// until ctx is cancelled. Default action when dunemgr runs with no subcommand.
+// until ctx is cancelled.
+//
+// Intentionally retained but unreferenced: the web UI is disabled as of 0.1.12
+// (the TUI is the default; see Run in cli.go). Re-add the "serve" /
+// "--print-token" switch cases in Run to re-enable it. Do not delete.
 func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)

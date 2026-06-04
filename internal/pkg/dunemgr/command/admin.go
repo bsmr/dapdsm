@@ -58,7 +58,11 @@ func adminCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr i
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "publish ok=%v\n%s\n", res.OK, res.RawOutput)
+	if res.OK {
+		fmt.Fprintf(stdout, "admin %s %s: published ok\n", verb, playerID)
+	} else {
+		fmt.Fprintf(stdout, "admin %s %s: publish FAILED\n%s\n", verb, playerID, res.RawOutput)
+	}
 	return nil
 }
 
@@ -122,13 +126,15 @@ func parseAdminFlags(verb string, args []string, stderr io.Writer) (map[string]s
 		}
 
 	case "skillpoints":
-		points := fs.String("points", "", "unspent skill points (default 0)")
+		points := fs.String("points", "", "unspent skill points to SET (absolute). Prefer the additive: give skillpoints <player> N")
 		if err := fs.Parse(args); err != nil {
 			return nil, false, err
 		}
-		if *points != "" {
-			fields["SkillPoints"] = *points
+		if *points == "" {
+			fmt.Fprintln(stderr, "admin skillpoints: --points N required (or use the presence-aware additive: give skillpoints <player> N)")
+			return nil, false, fmt.Errorf("admin skillpoints: --points required: %w", ErrUsage)
 		}
+		fields["SkillPoints"] = *points
 
 	case "vehicle":
 		var name string

@@ -47,6 +47,35 @@ type InvItem struct {
 const pawnSubquery = `(SELECT ps.player_pawn_id FROM dune.player_state ps ` +
 	`JOIN dune.accounts a ON a.id = ps.account_id WHERE a."user"::text = :'fls' LIMIT 1)`
 
+// InventoryBreakdown returns the per-inventory-type item counts for the player's
+// pawn in a single query (cheaper than PlayerInspect when only the drill list is
+// needed). Read-only; no audit.
+func (r *Runner) InventoryBreakdown(ctx context.Context, host, fls string) ([]InvBreakdown, error) {
+	sql := `SELECT inv.inventory_type, count(*)
+FROM dune.items i JOIN dune.inventories inv ON inv.id = i.inventory_id
+WHERE inv.actor_id = ` + pawnSubquery + `
+GROUP BY inv.inventory_type ORDER BY inv.inventory_type;`
+	res, err := r.execWithVars(ctx, host, sql, map[string]string{"fls": fls})
+	if err != nil {
+		return nil, fmt.Errorf("inventory breakdown: %w", err)
+	}
+	var out []InvBreakdown
+	for _, l := range strings.Split(strings.TrimRight(res.Stdout, "\n"), "\n") {
+		l = strings.TrimSpace(l)
+		if l == "" {
+			continue
+		}
+		p := strings.Split(l, "|")
+		if len(p) != 2 {
+			continue
+		}
+		it, _ := strconv.Atoi(p[0])
+		c, _ := strconv.ParseInt(p[1], 10, 64)
+		out = append(out, InvBreakdown{InventoryType: it, ItemCount: c})
+	}
+	return out, nil
+}
+
 // PlayerInspect returns a header + inventory aggregate for fls. topN bounds the
 // top-by-quality item list (≤0 defaults to 10; capped at 50). When raw is true,
 // the character components JSON is pretty-printed into RawComponents. Read-only; no audit.

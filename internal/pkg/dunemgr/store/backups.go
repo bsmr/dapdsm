@@ -24,10 +24,12 @@ type BackupRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Key returns the bbolt key for this record. NUL separator keeps
-// host/bg cleanly delimited from the timestamp+name.
+// Key returns the bbolt key for this record. "/" delimits host, bg, and the
+// timestamp+name segment, keeping the key printable and copy-pasteable
+// (e.g. "vm-a/sietch/7__nightly"). The prefix scan in ListBackups stays
+// unambiguous because host aliases and BG names contain no "/".
 func (r BackupRecord) Key() string {
-	return fmt.Sprintf("%s\x00%s\x00%d__%s", r.Host, r.BG, r.UnixTS, r.Name)
+	return fmt.Sprintf("%s/%s/%d__%s", r.Host, r.BG, r.UnixTS, r.Name)
 }
 
 // PutBackup inserts or replaces a record.
@@ -68,7 +70,7 @@ func (s *Store) DeleteBackup(key string) error {
 // ListBackups returns all records for one (host, bg) pair, newest
 // first.
 func (s *Store) ListBackups(host, bg string) ([]BackupRecord, error) {
-	prefix := []byte(host + "\x00" + bg + "\x00")
+	prefix := []byte(host + "/" + bg + "/")
 	var out []BackupRecord
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		c := tx.Bucket([]byte("backups")).Cursor()

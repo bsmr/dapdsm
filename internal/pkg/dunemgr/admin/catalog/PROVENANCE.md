@@ -44,3 +44,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+`stack-max.json` is distilled from `submodules/dune-admin/item-data.json` (`items[].stack_max`), Icehunter/dune-admin, MIT.

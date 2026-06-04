@@ -24,10 +24,12 @@ type ExportRecord struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-// Key returns the bbolt key. NUL separates the host from fls-timestamp so a
-// host prefix scan in ListExports is unambiguous.
+// Key returns the bbolt key for this record. "/" delimits host from the
+// fls-id/timestamp segment, keeping the key printable and copy-pasteable
+// (e.g. "vm-a/DEADBEEF-42"). The prefix scan in ListExports stays unambiguous
+// because host aliases contain no "/".
 func (e ExportRecord) Key() string {
-	return fmt.Sprintf("%s\x00%s-%d", e.Host, e.FLSID, e.UnixTS)
+	return fmt.Sprintf("%s/%s-%d", e.Host, e.FLSID, e.UnixTS)
 }
 
 // PutExport inserts or replaces a record.
@@ -59,7 +61,7 @@ func (s *Store) GetExport(key string) (ExportRecord, error) {
 
 // ListExports returns all records for one host, newest first.
 func (s *Store) ListExports(host string) ([]ExportRecord, error) {
-	prefix := []byte(host + "\x00")
+	prefix := []byte(host + "/")
 	var out []ExportRecord
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		c := tx.Bucket([]byte("avatars")).Cursor()

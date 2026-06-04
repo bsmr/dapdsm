@@ -88,6 +88,19 @@ func TestVehicleTemplates_UnknownID(t *testing.T) {
 	}
 }
 
+// TestDisplayName verifies that DisplayName returns the human name for a known
+// id (Ammo → "Light Darts") and falls back to the id for unknown entries.
+func TestDisplayName(t *testing.T) {
+	// "Ammo" is in items.json with name "Light Darts" — differs from the id.
+	const known = "Ammo"
+	if got := DisplayName(known); got == "" || got == known {
+		t.Fatalf("DisplayName(%q)=%q want a non-id display name", known, got)
+	}
+	if got := DisplayName("NoSuchTemplate_X"); got != "NoSuchTemplate_X" {
+		t.Fatalf("DisplayName(unknown)=%q want the id unchanged", got)
+	}
+}
+
 // TestCatalogCounts verifies the embedded catalogs have the expected entry counts.
 func TestCatalogCounts(t *testing.T) {
 	if got := len(Items()); got < 2000 {
@@ -98,5 +111,20 @@ func TestCatalogCounts(t *testing.T) {
 	}
 	if got := len(Vehicles()); got < 5 {
 		t.Errorf("Vehicles() count = %d, want >= 5", got)
+	}
+}
+
+// TestStackMax verifies StackMax returns the correct maximum stack size.
+// "Radiation_Suit" is non-stackable (stack_max=1) in the upstream catalog.
+// "AluminiumBar" is stackable (stack_max=500) in the upstream catalog.
+func TestStackMax(t *testing.T) {
+	if got := StackMax("Radiation_Suit"); got != 1 {
+		t.Fatalf("StackMax(Radiation_Suit)=%d want 1 (non-stackable)", got)
+	}
+	if got := StackMax("AluminiumBar"); got != 500 {
+		t.Fatalf("StackMax(AluminiumBar)=%d want 500 (stackable)", got)
+	}
+	if StackMax("NoSuchTemplate_X") != 0 {
+		t.Fatalf("unknown template must return 0")
 	}
 }

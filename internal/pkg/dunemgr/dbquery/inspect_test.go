@@ -118,3 +118,20 @@ func TestPlayerInspectRawPopulatesComponents(t *testing.T) {
 		t.Fatalf("raw components not populated: %q", d.RawComponents)
 	}
 }
+
+func TestInventoryBreakdownOneQuery(t *testing.T) {
+	r, rr := newXferRunner(t, "3|2\n7|5\n")
+	bs, err := r.InventoryBreakdown(context.Background(), "vm-a", "DEADBEEF")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bs) != 2 || bs[0].InventoryType != 3 || bs[0].ItemCount != 2 || bs[1].InventoryType != 7 {
+		t.Fatalf("breakdown = %+v", bs)
+	}
+	if !hasVar(rr.args, "fls=DEADBEEF") {
+		t.Fatalf("fls not bound as -v: %v", rr.args)
+	}
+	if strings.Contains(rr.stdinSQL, "DEADBEEF") {
+		t.Fatal("fls value leaked into SQL body")
+	}
+}
