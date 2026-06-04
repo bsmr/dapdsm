@@ -19,6 +19,10 @@ func versionCmd(_ context.Context, _ []string, stdout, _ io.Writer) error {
 
 // regenTokenCmd rotates the bearer token in the config dir and prints the
 // new value plus where it was written.
+//
+// Intentionally retained but unreferenced: the web UI is disabled as of 0.1.12
+// (see serveCmd and Run). Re-add the "regen-token" switch case in Run to
+// re-enable it. Do not delete.
 func regenTokenCmd(_ context.Context, _ []string, stdout, _ io.Writer) error {
 	dir, err := core.ConfigDir(os.Getenv)
 	if err != nil {

@@ -56,6 +56,30 @@ func TestGrantItemDBNoRowMeansFailure(t *testing.T) {
 	}
 }
 
+func TestGrantItemDBIgnoresCommandTag(t *testing.T) {
+	rr := &seqRunner{resp: []string{"9001\nINSERT 0 1\n"}}
+	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	id, err := r.GrantItemDB(context.Background(), "h", "FLS1", "item.blade", 3, 5)
+	if err != nil {
+		t.Fatalf("must parse the id line, not choke on the command tag: %v", err)
+	}
+	if id != 9001 {
+		t.Fatalf("id=%d want 9001", id)
+	}
+}
+
+func TestGrantSkillpointsIgnoresCommandTag(t *testing.T) {
+	rr := &seqRunner{resp: []string{"17\nUPDATE 1\n"}}
+	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	n, err := r.GrantSkillpoints(context.Background(), "h", "FLS1", 10)
+	if err != nil {
+		t.Fatalf("must parse the value line, not choke on the command tag: %v", err)
+	}
+	if n != 17 {
+		t.Fatalf("n=%d want 17", n)
+	}
+}
+
 func TestGrantSkillpointsAddsUnspentOnly(t *testing.T) {
 	rr := &seqRunner{resp: []string{"17\n"}}
 	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}

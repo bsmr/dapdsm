@@ -143,6 +143,20 @@ func TestAdminCmd_FlagParse_Item(t *testing.T) {
 	}
 }
 
+// TestAdminSkillpointsRequiresPoints verifies that "admin skillpoints" without
+// --points returns ErrUsage and steers the operator to "give skillpoints".
+// c is nil to prove the usage check fires before any Core dereference.
+func TestAdminSkillpointsRequiresPoints(t *testing.T) {
+	var out, errb bytes.Buffer
+	err := adminCmd(context.Background(), nil, []string{"vm-a", "skillpoints", "Mal"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("admin skillpoints without --points: err=%v want ErrUsage", err)
+	}
+	if !strings.Contains(errb.String(), "give skillpoints") {
+		t.Errorf("usage should steer to give skillpoints: %q", errb.String())
+	}
+}
+
 // TestAdminUnknownPlayerIsUsageError verifies that passing a player NAME (not a
 // raw FLS id or wildcard) resolves via the DB; if resolution fails (no host
 // reachable in tests) the error is wrapped as ErrUsage.
@@ -157,7 +171,7 @@ func TestAdminUnknownPlayerIsUsageError(t *testing.T) {
 }
 
 // TestAdminCmd_SpecRegistered verifies the "admin" spec is present and has the
-// right shape (first arg = host, second = fixed verb set, third = free player).
+// right shape (first arg = host, second = fixed verb set, SubArgs per verb).
 func TestAdminCmd_SpecRegistered(t *testing.T) {
 	spec, ok := SpecFor("admin")
 	if !ok {
@@ -166,8 +180,12 @@ func TestAdminCmd_SpecRegistered(t *testing.T) {
 	if spec.Summary == "" {
 		t.Error("admin spec has empty summary")
 	}
-	if len(spec.Args) < 3 {
-		t.Errorf("admin spec has %d args, want >= 3", len(spec.Args))
+	// Args holds host + verb; per-verb slots live in SubArgs.
+	if len(spec.Args) != 2 {
+		t.Errorf("admin spec has %d Args, want 2 (host + verb)", len(spec.Args))
+	}
+	if len(spec.SubArgs) == 0 {
+		t.Error("admin spec SubArgs must be populated")
 	}
 	// arg[0] = host, arg[1] = fixed verbs
 	candidates := spec.Candidates(1, nil)

@@ -40,10 +40,17 @@ const (
 
 const (
 	maxSkillpoints = 1000
-	maxItemCount   = 1000
-	maxCurrency    = 1_000_000_000
-	maxTrackXP     = 44182
-	maxCharXP      = 344440
+	// maxItemCount is a self-imposed blast-radius guard on `give item`, NOT a
+	// game/DB limit: the Funcom DB enforces no per-template stack max (verified
+	// live — dune.items has no template-max column, and merge_inventory_items /
+	// save_item never clamp; the real max lives in game assets and may be raised
+	// by a server stack-size multiplier). Set generously to cover known high
+	// stacks (e.g. SolarisCoin/"Solari" ~50000). Provisional/tunable pending the
+	// online test of what the game server does with an over-max stack on load.
+	maxItemCount = 50000
+	maxCurrency  = 1_000_000_000
+	maxTrackXP   = 44182
+	maxCharXP    = 344440
 )
 
 // validTracks is the allowlist of dune.specializationtracktype values give-xp

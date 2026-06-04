@@ -2,6 +2,7 @@ package store
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -76,5 +77,29 @@ func TestGetExportNotFound(t *testing.T) {
 
 	if _, err := s.GetExport("nope"); err != ErrNotFound {
 		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestExportKeyIsPrintableAndRoundTrips(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(filepath.Join(dir, "state.bolt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	rec := ExportRecord{Host: "vm-a", FLSID: "DEADBEEF", UnixTS: 42, CharacterName: "Mal"}
+	if strings.ContainsRune(rec.Key(), '\x00') {
+		t.Fatalf("key must not contain NUL: %q", rec.Key())
+	}
+	if err := s.PutExport(rec); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetExport(rec.Key())
+	if err != nil || got.CharacterName != "Mal" {
+		t.Fatalf("round-trip got=%+v err=%v", got, err)
+	}
+	rows, err := s.ListExports("vm-a")
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("ListExports got=%d err=%v, want 1", len(rows), err)
 	}
 }

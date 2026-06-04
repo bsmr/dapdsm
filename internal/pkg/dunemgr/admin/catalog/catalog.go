@@ -21,6 +21,9 @@ var rawSkills []byte
 //go:embed vehicles.json
 var rawVehicles []byte
 
+//go:embed stack-max.json
+var rawStackMax []byte
+
 // Item is one entry from items.json.
 type Item struct {
 	ID       string `json:"id"`
@@ -50,9 +53,11 @@ var (
 	allSkills   []Skill
 	allVehicles []Vehicle
 
-	itemIndex    map[string]struct{}
-	skillIndex   map[string]Skill
-	vehicleIndex map[string]Vehicle
+	itemIndex     map[string]struct{}
+	nameIndex     map[string]string
+	skillIndex    map[string]Skill
+	vehicleIndex  map[string]Vehicle
+	stackMaxIndex map[string]int
 )
 
 func init() {
@@ -61,8 +66,10 @@ func init() {
 	mustParseInto(rawVehicles, &allVehicles, "vehicles.json")
 
 	itemIndex = make(map[string]struct{}, len(allItems))
+	nameIndex = make(map[string]string, len(allItems))
 	for _, it := range allItems {
 		itemIndex[it.ID] = struct{}{}
+		nameIndex[it.ID] = it.Name
 	}
 
 	skillIndex = make(map[string]Skill, len(allSkills))
@@ -73,6 +80,10 @@ func init() {
 	vehicleIndex = make(map[string]Vehicle, len(allVehicles))
 	for _, v := range allVehicles {
 		vehicleIndex[v.ID] = v
+	}
+
+	if err := json.Unmarshal(rawStackMax, &stackMaxIndex); err != nil {
+		panic(fmt.Sprintf("catalog: parse stack-max.json: %v", err))
 	}
 }
 
@@ -137,3 +148,15 @@ func VehicleTemplates(id string) ([]string, bool) {
 	}
 	return v.Templates, true
 }
+
+// DisplayName returns the human display name for an item template id, or the id
+// unchanged when the catalog has no entry (graceful fallback).
+func DisplayName(id string) string {
+	if n, ok := nameIndex[id]; ok && n != "" {
+		return n
+	}
+	return id
+}
+
+// StackMax returns the maximum stack size for an item template, or 0 if unknown.
+func StackMax(id string) int { return stackMaxIndex[id] }

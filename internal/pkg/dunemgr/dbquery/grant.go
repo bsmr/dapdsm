@@ -74,6 +74,11 @@ RETURNING id::bigint;`
 	if out == "" {
 		return 0, fmt.Errorf("grant item (db): nothing inserted (no backpack or no free slot for fls)")
 	}
+	// A psql INSERT … RETURNING prints the id on the first line, then the
+	// command tag (e.g. "INSERT 0 1") on the next — take only the id line.
+	if i := strings.IndexByte(out, '\n'); i >= 0 {
+		out = strings.TrimSpace(out[:i])
+	}
 	id, err := strconv.ParseInt(out, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("grant item (db): parse id %q: %w", out, err)
@@ -156,6 +161,11 @@ RETURNING (fe.components #>> '{FLevelComponent,1,UnspentSkillPoints}')::bigint;`
 	out := strings.TrimSpace(res.Stdout)
 	if out == "" {
 		return 0, fmt.Errorf("grant skillpoints: no character updated (unknown fls)")
+	}
+	// A psql UPDATE … RETURNING prints the value on the first line, then the
+	// command tag (e.g. "UPDATE 1") on the next — take only the value line.
+	if i := strings.IndexByte(out, '\n'); i >= 0 {
+		out = strings.TrimSpace(out[:i])
 	}
 	n, err := strconv.ParseInt(out, 10, 64)
 	if err != nil {

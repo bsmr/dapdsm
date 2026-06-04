@@ -34,6 +34,12 @@ type Spec struct {
 	Verb    string
 	Summary string
 	Args    []argSlot
+	// SubArgs optionally overrides the slots that follow the argFixed sub
+	// slot, keyed by the sub-verb token. When set and the typed sub-verb is a
+	// key, positions after the sub slot resolve from SubArgs[sub] instead of
+	// Args. Used by verbs whose later slots depend on the sub-verb (currently
+	// admin and avatar). Verbs with positionally-fixed slots leave it nil.
+	SubArgs map[string][]argSlot
 }
 
 // specs maps verb -> Spec. Keep in sync with the dispatch table.
@@ -50,6 +56,14 @@ var specs = map[string]Spec{
 			{kind: argHost, name: "host"},
 			{kind: argFixed, options: []string{"list", "get", "set"}, name: "sub"},
 			{kind: argCatalog, catalogKey: "ini", name: "key"},
+		},
+	},
+	"item": {
+		Verb: "item", Summary: "Edit/delete a single inventory item by id (offline player)",
+		Args: []argSlot{
+			{kind: argHost, name: "host"},
+			{kind: argFixed, options: []string{"set", "delete"}, name: "sub"},
+			{kind: argFree, name: "item-id"},
 		},
 	},
 	"lifecycle": {
@@ -80,7 +94,13 @@ var specs = map[string]Spec{
 		Args: []argSlot{
 			{kind: argHost, name: "host"},
 			{kind: argFixed, options: []string{"currency", "item", "skillpoints", "xp", "charxp"}, name: "sub"},
-			{kind: argFree, name: "args"},
+		},
+		SubArgs: map[string][]argSlot{
+			"currency":    {{kind: argPlayer, name: "player"}, {kind: argFree, name: "currency-id"}, {kind: argFree, name: "delta"}},
+			"item":        {{kind: argPlayer, name: "player"}, {kind: argCatalog, catalogKey: "items", name: "template"}, {kind: argFree, name: "count"}},
+			"skillpoints": {{kind: argPlayer, name: "player"}, {kind: argFree, name: "amount"}},
+			"xp":          {{kind: argPlayer, name: "player"}, {kind: argFree, name: "amount"}},
+			"charxp":      {{kind: argPlayer, name: "player"}, {kind: argFree, name: "amount"}},
 		},
 	},
 	"player": {
@@ -88,21 +108,21 @@ var specs = map[string]Spec{
 		Args: []argSlot{
 			{kind: argHost, name: "host"},
 			{kind: argFixed, options: []string{"search", "pos", "inspect"}, name: "sub"},
-			{kind: argFree, name: "query"},
+			{kind: argPlayer, name: "query"},
 		},
 	},
 	"avatar": {
 		Verb: "avatar", Summary: "Export / list / import / transfer a single player's avatar",
 		Args: []argSlot{
-			{kind: argFixed, options: []string{"export", "list", "import", "transfer"}, name: "sub"},
 			{kind: argHost, name: "host"},
-			// Slot 2 is the dst-host for `transfer` and the fls-id for the
-			// other sub-verbs. Marked argHost so `transfer` gets host
-			// completion on both hosts; on export/list/import the host hints
-			// on the fls slot are harmless and ignorable (cf. admin's catalog
-			// default on its name slot).
-			{kind: argHost, name: "host-or-fls"},
-			{kind: argFree, name: "args"},
+			{kind: argFixed, options: []string{"export", "list", "exports", "import", "transfer"}, name: "sub"},
+		},
+		SubArgs: map[string][]argSlot{
+			"export":   {{kind: argPlayer, name: "player"}},
+			"list":     {},
+			"exports":  {},
+			"import":   {{kind: argPlayer, name: "player"}, {kind: argFree, name: "key"}},
+			"transfer": {{kind: argHost, name: "dst-host"}, {kind: argPlayer, name: "player"}},
 		},
 	},
 	"backup": {
@@ -136,22 +156,32 @@ var specs = map[string]Spec{
 	},
 }
 
-// init registers the "admin" spec after the admin package verb list is available.
+// init registers the "admin" spec after the admin package verb list is
+// available. Every admin verb takes a player slot; item/skill/vehicle add a
+// catalog name slot. Other verbs expose no catalog (so the suggestion line is
+// not flooded with irrelevant items).
 func init() {
+	sub := make(map[string][]argSlot, len(admin.Verbs()))
+	for _, v := range admin.Verbs() {
+		slots := []argSlot{{kind: argPlayer, name: "player-id"}}
+		switch v {
+		case "item":
+			slots = append(slots, argSlot{kind: argCatalog, catalogKey: "items", name: "name"})
+		case "skill":
+			slots = append(slots, argSlot{kind: argCatalog, catalogKey: "skills", name: "name"})
+		case "vehicle":
+			slots = append(slots, argSlot{kind: argCatalog, catalogKey: "vehicles", name: "name"})
+		}
+		sub[v] = slots
+	}
 	specs["admin"] = Spec{
 		Verb:    "admin",
 		Summary: "Publish an in-game admin command to a player via MQ",
 		Args: []argSlot{
 			{kind: argHost, name: "host"},
 			{kind: argFixed, options: admin.Verbs(), name: "verb"},
-			{kind: argFree, name: "player-id"},
-			// The name arg (ItemName/Module/ClassName) is catalog-backed.
-			// Completion peeks at the typed verb token (tokens[1] if present)
-			// to select the right catalog. Verbs without a catalog name arg
-			// (kick, clean, reset, water, xp, skillpoints, teleport*) default
-			// to items — the operator sees a suggestion list but can ignore it.
-			{kind: argCatalog, catalogKey: "items", name: "name"},
 		},
+		SubArgs: sub,
 	}
 }
 
@@ -160,21 +190,63 @@ func (s Spec) FirstArgIsHost() bool {
 	return len(s.Args) > 0 && s.Args[0].kind == argHost
 }
 
-// IsCatalogPos reports whether the argument slot at pos (0-based) is a
-// catalog-backed slot. The TUI uses this to suppress suggestions on empty tokens
-// (the catalog may have thousands of entries).
-func (s Spec) IsCatalogPos(pos int) bool {
-	if pos < 0 || pos >= len(s.Args) {
-		return false
+// fixedSlotIndex returns the index of the argFixed slot in Args, or -1.
+func (s Spec) fixedSlotIndex() int {
+	for i, a := range s.Args {
+		if a.kind == argFixed {
+			return i
+		}
 	}
-	return s.Args[pos].kind == argCatalog
+	return -1
 }
 
-// IsPlayerPos reports whether the slot at pos (0-based) is a player-name slot.
-// The TUI uses this to query its live per-host player-name cache instead of
-// the static candidate sets returned by Candidates.
-func (s Spec) IsPlayerPos(pos int) bool {
-	return pos >= 0 && pos < len(s.Args) && s.Args[pos].kind == argPlayer
+// slotAt returns the effective argSlot at pos (0-based into the logical arg
+// list, i.e. command-line token index minus one), given the already-typed
+// tokens (tokens[0] is the verb). When the verb declares SubArgs and the
+// sub-verb token names a key, positions after the argFixed sub slot resolve
+// from SubArgs; otherwise from Args. ok is false for an out-of-range pos.
+func (s Spec) slotAt(pos int, tokens []string) (argSlot, bool) {
+	if pos < 0 {
+		return argSlot{}, false
+	}
+	if s.SubArgs != nil {
+		if sub := s.fixedSlotIndex(); sub >= 0 {
+			if len(tokens) > sub+1 {
+				if subSlots, ok := s.SubArgs[tokens[sub+1]]; ok {
+					if pos <= sub {
+						if pos < len(s.Args) {
+							return s.Args[pos], true
+						}
+						return argSlot{}, false
+					}
+					rel := pos - (sub + 1)
+					if rel < len(subSlots) {
+						return subSlots[rel], true
+					}
+					return argSlot{}, false
+				}
+			}
+		}
+	}
+	if pos < len(s.Args) {
+		return s.Args[pos], true
+	}
+	return argSlot{}, false
+}
+
+// IsCatalogPos reports whether the slot at pos is catalog-backed, given the
+// typed tokens (needed for SubArgs verbs). The TUI suppresses suggestions on
+// an empty token for these slots.
+func (s Spec) IsCatalogPos(pos int, tokens ...string) bool {
+	slot, ok := s.slotAt(pos, tokens)
+	return ok && slot.kind == argCatalog
+}
+
+// IsPlayerPos reports whether the slot at pos is a player-name slot, given the
+// typed tokens. The TUI serves these from its live per-host name cache.
+func (s Spec) IsPlayerPos(pos int, tokens ...string) bool {
+	slot, ok := s.slotAt(pos, tokens)
+	return ok && slot.kind == argPlayer
 }
 
 // Specs returns all verb specs, sorted by verb.
@@ -221,59 +293,27 @@ func (s Spec) Usage() string {
 	return out
 }
 
-// Candidates returns the completion pool for the positional argument at index
-// pos (0-based into Args; i.e. command-line token position minus one), given the
-// known host names. It returns nil for a freeform slot or an out-of-range pos.
-// This keeps the unexported argKind/options inside command — the TUI never needs
-// to know the slot kinds, only the resulting candidate strings.
-//
-// tokens is an optional variadic parameter holding the already-typed prefix
-// tokens (i.e. everything before the current in-progress token). It is used by
-// argCatalog slots to select the right catalog based on the typed verb token
-// (tokens[1] for the admin verb, which sits at arg index 0 = tokens[0] being
-// the outer verb, tokens[1] being the admin sub-verb).
+// Candidates returns the completion pool for the slot at pos given the known
+// hosts and the typed tokens. nil for freeform/player/out-of-range slots.
 func (s Spec) Candidates(pos int, hosts []string, tokens ...string) []string {
-	if pos < 0 || pos >= len(s.Args) {
+	slot, ok := s.slotAt(pos, tokens)
+	if !ok {
 		return nil
 	}
-	switch a := s.Args[pos]; a.kind {
+	switch slot.kind {
 	case argFixed:
-		return append([]string(nil), a.options...)
+		return append([]string(nil), slot.options...)
 	case argHost:
 		return append([]string(nil), hosts...)
 	case argCatalog:
-		return catalogCandidates(a.catalogKey, tokens)
-	case argPlayer:
-		return nil // the TUI supplies names from its live per-host cache
-	default: // argFree
+		return catalogCandidates(slot.catalogKey)
+	default: // argFree, argPlayer
 		return nil
 	}
 }
 
-// catalogCandidates resolves the catalog key, optionally overriding it based
-// on the admin sub-verb found in tokens[2] (the third typed token). The tokens
-// slice passed here is the full prefix-token list for the line:
-//
-//	tokens[0] = outer verb ("admin")
-//	tokens[1] = host
-//	tokens[2] = admin sub-verb ("item", "skill", "vehicle", …)
-//	tokens[3] = player-id
-//
-// Falls back to the slot's declared catalogKey (items) for verbs without a
-// catalog name arg.
-func catalogCandidates(defaultKey string, tokens []string) []string {
-	key := defaultKey
-	// adminSubVerb is at index 2 in the full token list.
-	if len(tokens) > 2 {
-		switch tokens[2] {
-		case "skill":
-			key = "skills"
-		case "vehicle":
-			key = "vehicles"
-		case "item":
-			key = "items"
-		}
-	}
+// catalogCandidates resolves a catalog key to its vendored candidate list.
+func catalogCandidates(key string) []string {
 	switch key {
 	case "skills":
 		return admincatalog.SkillIDs()

@@ -13,11 +13,12 @@ import (
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
 )
 
-const giveUsage = `usage: dunemgr give <host> currency <name|fls> <currency-id> <delta> [--check] [--force] [--id]
-       dunemgr give <host> item <name|fls> <item-name> <count> [--quality N] [--durability F] [--check] [--id]
-       dunemgr give <host> skillpoints <name|fls> <amount> [--check] [--force] [--id]
-       dunemgr give <host> xp <name|fls> <amount> --track <Combat|Melee|Mentat|Trooper|Swordmaster|Planetologist|BeneGesserit|Vehicle> [--check] [--id]
-       dunemgr give <host> charxp <name|fls> <amount> [--check] [--force] [--id]`
+const giveUsage = `usage:
+  dunemgr give <host> currency <name|fls> <currency-id> <delta> [--check] [--force] [--id]
+  dunemgr give <host> item <name|fls> <item-name> <count> [--quality N] [--durability F] [--check] [--id]
+  dunemgr give <host> skillpoints <name|fls> <amount> [--check] [--force] [--id]
+  dunemgr give <host> xp <name|fls> <amount> --track <Combat|Melee|Mentat|Trooper|Swordmaster|Planetologist|BeneGesserit|Vehicle> [--check] [--id]
+  dunemgr give <host> charxp <name|fls> <amount> [--check] [--force] [--id]`
 
 func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {

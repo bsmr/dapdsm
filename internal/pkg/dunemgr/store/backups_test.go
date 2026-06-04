@@ -2,6 +2,7 @@ package store
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -56,6 +57,13 @@ func TestBackupRecordRoundtrip(t *testing.T) {
 	}
 	if _, err := s.GetBackup(rec.Key()); err == nil {
 		t.Error("GetBackup after delete err=nil, want ErrNotFound")
+	}
+}
+
+func TestBackupKeyIsPrintable(t *testing.T) {
+	rec := BackupRecord{Host: "vm-a", BG: "sietch", UnixTS: 7, Name: "nightly"}
+	if strings.ContainsRune(rec.Key(), '\x00') {
+		t.Fatalf("key must not contain NUL: %q", rec.Key())
 	}
 }
 

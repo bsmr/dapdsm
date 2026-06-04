@@ -62,20 +62,38 @@ func TestHelpListsAllDispatcherVerbs(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	for _, verb := range []string{"admin", "avatar", "backup", "broadcast", "db", "host", "ini", "lifecycle", "player", "shutdown", "stats", "whisper"} {
+	for _, verb := range []string{"admin", "avatar", "backup", "broadcast", "db", "give", "host", "ini", "item", "lifecycle", "player", "shutdown", "stats", "whisper"} {
 		if !strings.Contains(got, verb) {
 			t.Fatalf("help missing dispatcher verb %q", verb)
 		}
 	}
 }
 
-func TestServeRejectsUnknownFlag(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	t.Setenv("XDG_DATA_HOME", dir)
-	var stdout, stderr bytes.Buffer
-	err := Run(context.Background(), []string{"serve", "--bogus"}, nil, &stdout, &stderr)
-	if err == nil {
-		t.Error("serve --bogus: want parse error, got nil")
+// The web UI is disabled in 0.1.12: serve and the token verbs are unwired from
+// the CLI, so they are now rejected as unknown verbs (ErrUsage) without opening
+// the core. The server/ package and token code stay in the tree for re-enabling.
+func TestWebUIVerbsAreUnwired(t *testing.T) {
+	for _, verb := range []string{"serve", "--print-token", "regen-token"} {
+		_, _, err := runArgs(verb)
+		if !errors.Is(err, ErrUsage) {
+			t.Errorf("%q: err = %v, want ErrUsage", verb, err)
+		}
+	}
+}
+
+// With the web UI disabled, usage must no longer advertise it or its token
+// verbs, and must present the TUI as the default action.
+func TestHelpOmitsWebUI(t *testing.T) {
+	out, _, err := runArgs("help")
+	if err != nil {
+		t.Fatalf("help: %v", err)
+	}
+	for _, gone := range []string{"web UI", "regen-token", "--print-token"} {
+		if strings.Contains(out, gone) {
+			t.Errorf("help still mentions %q:\n%s", gone, out)
+		}
+	}
+	if !strings.Contains(out, "terminal UI") {
+		t.Errorf("help does not present the terminal UI as default:\n%s", out)
 	}
 }

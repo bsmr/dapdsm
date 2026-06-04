@@ -21,4 +21,12 @@ func TestOpenLockedReturnsClearError(t *testing.T) {
 	if !strings.Contains(err.Error(), "database locked") {
 		t.Errorf("error = %q, want it to mention 'database locked'", err)
 	}
+	// The hint must point at the current lock holder (the TUI, since the web UI
+	// is disabled), not the removed "serve" verb.
+	if !strings.Contains(err.Error(), "tui") {
+		t.Errorf("error = %q, want it to hint at a running tui instance", err)
+	}
+	if strings.Contains(err.Error(), "serve") {
+		t.Errorf("error = %q, must not reference the removed serve verb", err)
+	}
 }

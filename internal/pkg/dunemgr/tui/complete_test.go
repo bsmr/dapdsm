@@ -2,6 +2,7 @@ package tui
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
@@ -147,21 +148,6 @@ func TestSuggestPlayerEmptyTokenListsAll(t *testing.T) {
 	}
 }
 
-func TestEffectiveArgPosShiftsForImpliedHost(t *testing.T) {
-	hosts := []string{"vm-a", "vm-b"}
-	wspec, _ := command.SpecFor("whisper")
-	if got := effectiveArgPos(wspec, []string{"whisper"}, hosts); got != 1 {
-		t.Fatalf("implied host: argPos=%d want 1", got)
-	}
-	if got := effectiveArgPos(wspec, []string{"whisper", "vm-a"}, hosts); got != 1 {
-		t.Fatalf("explicit host: argPos=%d want 1", got)
-	}
-	hspec, _ := command.SpecFor("host")
-	if got := effectiveArgPos(hspec, []string{"host"}, hosts); got != 0 {
-		t.Fatalf("non-host verb: argPos=%d want 0", got)
-	}
-}
-
 func TestSuggestPlayerWithImpliedHost(t *testing.T) {
 	cache := map[string][]string{"vm-a": {"Stilgar", "Stilburn", "Muad'Dib"}}
 	got := suggest("whisper Sti", []string{"vm-a"}, "vm-a", cache)
@@ -180,6 +166,85 @@ func TestCompleteImpliedHostKeepsHostOutOfLine(t *testing.T) {
 	// unique match adds a trailing space; the host must NOT appear in the line
 	if line != "whisper Stilgar " {
 		t.Fatalf("complete must rebuild the RAW line (no host): %q", line)
+	}
+}
+
+func TestSuggestNameCompletionImpliedHost(t *testing.T) {
+	hosts := []string{"vm-a", "vm-b"}
+	cache := map[string][]string{"vm-a": {"Malik", "Mallory", "Zed"}}
+	// implied host: "player inspect Mal" → name slot, prefix "Mal".
+	got := suggest("player inspect Mal", hosts, "vm-a", cache)
+	if len(got) != 2 || got[0] != "Malik" || got[1] != "Mallory" {
+		t.Fatalf("implied-host name completion = %v, want [Malik Mallory]", got)
+	}
+	// explicit host: "player vm-a inspect Mal" → same result.
+	got = suggest("player vm-a inspect Mal", hosts, "vm-a", cache)
+	if len(got) != 2 {
+		t.Fatalf("explicit-host name completion = %v, want 2", got)
+	}
+}
+
+// The H-fix: admin's SubArgs catalog/player slots resolve correctly under an
+// implied host (sub-verb token lands at the normalised index 2).
+func TestSuggestAdminImpliedHostSubArgs(t *testing.T) {
+	hosts := []string{"vm-a"}
+	cache := map[string][]string{"vm-a": {"Malik"}}
+	// implied host: "admin skill Mal" → player-id slot (idx 2) → name cache.
+	got := suggest("admin skill Mal", hosts, "vm-a", cache)
+	if len(got) != 1 || got[0] != "Malik" {
+		t.Fatalf("implied-host admin player completion = %v, want [Malik]", got)
+	}
+	// implied host: catalog slot for the skill verb resolves to skills (idx 3
+	// (0-based) after normalisation): "admin skill player-x Skills.Ability.H".
+	got = suggest("admin skill player-x Skills.Ability.H", hosts, "vm-a", cache)
+	if len(got) == 0 {
+		t.Fatalf("implied-host admin skill catalog should resolve, got empty")
+	}
+	for _, c := range got {
+		if !strings.HasPrefix(c, "Skills.Ability.H") {
+			t.Fatalf("catalog candidate %q does not match prefix", c)
+		}
+	}
+}
+
+func TestNormalizeTokensInsertsImpliedHost(t *testing.T) {
+	w, _ := command.SpecFor("whisper")
+	hosts := []string{"vm-a"}
+	got := normalizeTokens(w, []string{"whisper"}, "vm-a", hosts)
+	if len(got) != 2 || got[1] != "vm-a" {
+		t.Fatalf("normalize = %v, want [whisper vm-a]", got)
+	}
+	// explicit host is not doubled.
+	got = normalizeTokens(w, []string{"whisper", "vm-a"}, "vm-a", hosts)
+	if len(got) != 2 {
+		t.Fatalf("explicit host normalize = %v, want unchanged", got)
+	}
+	h, _ := command.SpecFor("host") // not host-first: first arg is argFixed "sub"
+	got = normalizeTokens(h, []string{"host"}, "vm-a", hosts)
+	if len(got) != 1 {
+		t.Fatalf("non-host-first: normalize = %v, want unchanged", got)
+	}
+}
+
+func TestSuggestAvatarTransferSlots(t *testing.T) {
+	hosts := []string{"vm-a", "vm-b"}
+	cache := map[string][]string{"vm-a": {"Malik"}}
+	// implied src host: "avatar transfer " → dst-host slot → host candidates.
+	got := suggest("avatar transfer ", hosts, "vm-a", cache)
+	if len(got) != 2 {
+		t.Fatalf("avatar transfer dst-host = %v, want 2 hosts", got)
+	}
+	// next slot is the player name.
+	got = suggest("avatar transfer vm-b Mal", hosts, "vm-a", cache)
+	if len(got) != 1 || got[0] != "Malik" {
+		t.Fatalf("avatar transfer name = %v, want [Malik]", got)
+	}
+}
+
+func TestUsageHintShowsFlags(t *testing.T) {
+	got := usageHint("item set")
+	if !strings.Contains(got, "--qty") || !strings.Contains(got, "--confirm") {
+		t.Fatalf("usage hint for 'item set' should show flags, got %q", got)
 	}
 }
 

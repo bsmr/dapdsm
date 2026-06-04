@@ -31,6 +31,7 @@ var table = map[string]Handler{
 	"db":        dbCmd,
 	"give":      giveCmd,
 	"host":      hostCmd,
+	"item":      itemCmd,
 	"ini":       iniCmd,
 	"lifecycle": lifecycleCmd,
 	"player":    playerCmd,
