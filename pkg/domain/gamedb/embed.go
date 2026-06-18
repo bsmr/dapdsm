@@ -1,4 +1,4 @@
-package dbquery
+package gamedb
 
 import (
 	"embed"
@@ -14,7 +14,7 @@ var sqlFS embed.FS
 func q(name string) string {
 	b, err := sqlFS.ReadFile("sql/" + name + ".sql")
 	if err != nil {
-		panic(fmt.Sprintf("dbquery: missing embedded SQL %q: %v", name, err))
+		panic(fmt.Sprintf("gamedb: missing embedded SQL %q: %v", name, err))
 	}
 	return string(b)
 }

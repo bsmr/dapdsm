@@ -1,4 +1,4 @@
-// Package dbquery binds the Funcom game DB's stored functions and the
+// Package gamedb binds the Funcom game DB's stored functions and the
 // project's own SQL into typed Go calls over the kubectl-exec psql wire.
 //
 // SQL lives in sql/<name>.sql (go:embed) and is loaded via q("name"); Go
@@ -9,4 +9,4 @@
 // Exceptions kept inline: SQL composed from shared fragments (pawnSubquery,
 // itemPawnScope) and SQL built with fmt.Sprintf over dynamic identifiers
 // (schema column listing, slow-query report).
-package dbquery
+package gamedb

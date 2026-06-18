@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/domain/grant"
 	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 )
@@ -27,7 +27,7 @@ func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io
 	}
 	host, sub, rest := args[0], args[1], args[2:]
 	g := &grant.Granter{
-		DB:    &dbquery.Runner{SSH: c.SSH, Store: c.Store},
+		DB:    &gamedb.Runner{SSH: c.SSH, Store: c.Store},
 		MQ:    &mq.Publisher{SSH: c.SSH, Store: c.Store},
 		Store: c.Store,
 	}
@@ -128,7 +128,7 @@ func giveCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io
 	}
 	req.Force = *force
 
-	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	dbr := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 	resolved, err := resolvePlayerArg(ctx, dbr, host, req.FLS, *id, stderr)
 	if err != nil {
 		return err

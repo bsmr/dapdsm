@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 // dbCmd runs a DB query (exec|columns|slow) against the BattleGroup database
@@ -19,7 +19,7 @@ func dbCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.W
 		return fmt.Errorf("db: usage: %w", ErrUsage)
 	}
 	host, sub, rest := args[0], args[1], args[2:]
-	r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 	switch sub {
 	case "exec":
 		if len(rest) < 1 {

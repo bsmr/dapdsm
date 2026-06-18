@@ -1,6 +1,6 @@
-// Package dbquery runs ad-hoc SQL against the Funcom game database by
+// Package gamedb runs ad-hoc SQL against the Funcom game database by
 // piping it to `psql` inside the DB pod via SSH+kubectl-exec.
-package dbquery
+package gamedb
 
 import (
 	"context"

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/domain/grant"
 	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 )
@@ -58,7 +58,7 @@ func whisperCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr
 		}
 	}
 
-	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	dbr := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 	var err error
 	fls, err = resolvePlayerArg(ctx, dbr, host, fls, *id, stderr)
 	if err != nil {
@@ -87,7 +87,7 @@ func whisperCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr
 
 	pub := &mq.Publisher{SSH: c.SSH, Store: c.Store}
 	if *as != "" {
-		p := &grant.Persona{DB: &dbquery.Runner{SSH: c.SSH, Store: c.Store}, Store: c.Store}
+		p := &grant.Persona{DB: &gamedb.Runner{SSH: c.SSH, Store: c.Store}, Store: c.Store}
 		if err := p.Seed(ctx, "cli", host, *as); err != nil {
 			return err
 		}

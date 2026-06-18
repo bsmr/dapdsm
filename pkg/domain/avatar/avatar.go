@@ -1,6 +1,6 @@
 // Package avatar implements per-character export / import / transfer on top of
 // the Funcom-native dune.character_transfer_* functions, reached through the
-// dbquery transport. It mirrors the backup package: managed records + files +
+// gamedb transport. It mirrors the backup package: managed records + files +
 // audit, with --confirm gating destructive imports and a --check dry-run.
 package avatar
 
@@ -15,8 +15,8 @@ import (
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
-// DB is the subset of dbquery.Runner the avatar Runner needs. As an interface
-// it lets tests inject a fake without re-faking the SSH wire. *dbquery.Runner
+// DB is the subset of gamedb.Runner the avatar Runner needs. As an interface
+// it lets tests inject a fake without re-faking the SSH wire. *gamedb.Runner
 // satisfies it.
 type DB interface {
 	IsPlayerOffline(ctx context.Context, host, fls string) (bool, error)

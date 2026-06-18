@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
@@ -20,7 +20,7 @@ func TestPersonaHexIDKnown(t *testing.T) {
 
 func TestSeedPersonaWritesBaseTables(t *testing.T) {
 	rec := &recorder{offline: true, publishStdout: ""}
-	db := &dbquery.Runner{SSH: &ssh.Client{Runner: rec}, Store: newTempStore(t)}
+	db := &gamedb.Runner{SSH: &ssh.Client{Runner: rec}, Store: newTempStore(t)}
 	p := &Persona{DB: db, Store: db.Store}
 	if err := p.Seed(context.Background(), "op", "h", "GM"); err != nil {
 		t.Fatal(err)

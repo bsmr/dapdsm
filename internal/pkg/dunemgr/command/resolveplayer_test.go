@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 func TestFormatAmbiguousListsCandidates(t *testing.T) {
 	var b bytes.Buffer
-	formatAmbiguous(&b, "Stil", []dbquery.Player{
+	formatAmbiguous(&b, "Stil", []gamedb.Player{
 		{FLSID: "A1", CharacterName: "Stilgar", OnlineStatus: "Offline"},
 		{FLSID: "A2", CharacterName: "Stilburn", OnlineStatus: "Online"},
 	})

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
@@ -114,7 +114,7 @@ type Result struct {
 
 // Granter orchestrates presence resolution + backend routing + audit.
 type Granter struct {
-	DB    *dbquery.Runner
+	DB    *gamedb.Runner
 	MQ    *mq.Publisher
 	Store *store.Store
 }

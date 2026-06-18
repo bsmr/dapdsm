@@ -6,7 +6,7 @@ import (
 	"text/tabwriter"
 
 	admincatalog "go.muehmer.eu/dapdsm/pkg/domain/catalog"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 // inventoryTypeNames maps Funcom's raw dune.inventories.inventory_type integer
@@ -31,7 +31,7 @@ func InventoryTypeName(t int) string {
 // vitals + spice) as a string. The RawComponents block is excluded; callers
 // that need it should append it separately. Returns a "no player" line when
 // d.Found is false.
-func FormatInspect(d *dbquery.PlayerDetail) string {
+func FormatInspect(d *gamedb.PlayerDetail) string {
 	var b strings.Builder
 	if !d.Found {
 		fmt.Fprintf(&b, "no player with fls %s\n", d.FLSID)
@@ -71,7 +71,7 @@ func FormatInspect(d *dbquery.PlayerDetail) string {
 
 // FormatInventoryItems renders the item stacks of one inventory type, numbered,
 // each with its dune.items id (the handle for `item set`/`item delete`).
-func FormatInventoryItems(inventoryType int, rows []dbquery.ItemRow) string {
+func FormatInventoryItems(inventoryType int, rows []gamedb.ItemRow) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %d stacks\n", InventoryTypeName(inventoryType), len(rows))
 	if len(rows) == 0 {

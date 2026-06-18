@@ -1,4 +1,4 @@
-package dbquery
+package gamedb
 
 import (
 	"context"
@@ -171,40 +171,7 @@ func (r *Runner) probeLevelColumn(ctx context.Context, host string) (string, err
 // execWithVars runs SQL via psql, passing extra -v key=value bindings so that
 // user-controlled values never appear in the SQL body.
 func (r *Runner) execWithVars(ctx context.Context, host, sql string, vars map[string]string) (*ExecResult, error) {
-	t, err := r.discoverDB(ctx, host)
-	if err != nil {
-		return nil, err
-	}
-	db := r.Database
-	if db == "" {
-		db = DefaultDatabase
-	}
-
-	// Build psql argv: base flags, then one -v key=value per variable.
-	psqlArgs := []string{
-		"exec", "-i", "-n", t.Namespace, t.Pod, "--",
-		"env", funcomPGOptions,
-		"psql",
-		"-h", "127.0.0.1",
-		"-p", strconv.Itoa(t.Port),
-		"-U", t.SuperUser,
-		"-d", db,
-		"-tA", "-F", "|",
-	}
-	for k, v := range vars {
-		psqlArgs = append(psqlArgs, "-v", k+"="+v)
-	}
-	psqlArgs = append(psqlArgs, "-f", "-")
-
-	res, err := r.SSH.RunWithStdin(ctx, host, []byte(sql), "kubectl", psqlArgs...)
-	if err != nil {
-		return nil, fmt.Errorf("psql exec: %w", err)
-	}
-	if res.ExitCode != 0 {
-		msg := strings.TrimSpace(res.Stderr)
-		return nil, fmt.Errorf("psql exit %d: %s", res.ExitCode, msg)
-	}
-	return &ExecResult{Stdout: res.Stdout, Stderr: res.Stderr}, nil
+	return r.run(ctx, host, sql, vars)
 }
 
 // PlayerSearch finds players matching query (a SQL LIKE pattern applied to

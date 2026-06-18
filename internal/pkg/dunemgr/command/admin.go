@@ -10,7 +10,7 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 )
 
@@ -46,7 +46,7 @@ func adminCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr i
 
 	// Resolve the player reference unless it is the wildcard "*" or --id is set.
 	if playerID != "*" {
-		dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		dbr := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		playerID, err = resolvePlayerArg(ctx, dbr, host, playerID, useID, stderr)
 		if err != nil {
 			return err

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
@@ -94,7 +94,7 @@ func mustGranter(t *testing.T, offline bool) (*Granter, *recorder) {
 	t.Helper()
 	rec := &recorder{offline: offline, publishStdout: "publish=ok\n"}
 	st := newTempStore(t)
-	db := &dbquery.Runner{SSH: &ssh.Client{Runner: rec}, Store: st}
+	db := &gamedb.Runner{SSH: &ssh.Client{Runner: rec}, Store: st}
 	pub := &mq.Publisher{SSH: &ssh.Client{Runner: rec}, Store: st}
 	return &Granter{DB: db, MQ: pub, Store: st}, rec
 }

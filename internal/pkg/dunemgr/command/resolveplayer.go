@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"io"
 
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 // resolvePlayerArg turns ref (a character name or a FLS id) into a FLS id for a
 // player-targeting verb. With useID, ref is taken as a raw FLS (no resolution).
 // On an ambiguous name it writes the candidate list to stderr and returns
 // ErrUsage; on no match it returns the resolver error wrapped as ErrUsage.
-func resolvePlayerArg(ctx context.Context, dbr *dbquery.Runner, host, ref string, useID bool, stderr io.Writer) (string, error) {
+func resolvePlayerArg(ctx context.Context, dbr *gamedb.Runner, host, ref string, useID bool, stderr io.Writer) (string, error) {
 	if useID {
 		return ref, nil
 	}
@@ -29,7 +29,7 @@ func resolvePlayerArg(ctx context.Context, dbr *dbquery.Runner, host, ref string
 }
 
 // formatAmbiguous prints the candidate players for an ambiguous reference.
-func formatAmbiguous(w io.Writer, ref string, players []dbquery.Player) {
+func formatAmbiguous(w io.Writer, ref string, players []gamedb.Player) {
 	fmt.Fprintf(w, "%q matches %d players — narrow it or pass the fls with --id:\n", ref, len(players))
 	for _, p := range players {
 		fmt.Fprintf(w, "  %s  %s  (%s)\n", p.FLSID, p.CharacterName, p.OnlineStatus)

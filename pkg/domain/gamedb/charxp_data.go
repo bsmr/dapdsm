@@ -1,4 +1,4 @@
-package dbquery
+package gamedb
 
 // Character-XP progression data vendored from dune-admin (MIT, Ryan Wilson),
 // commit 4e09a92, files cmd/dune-admin/db.go + cmd/dune-admin/keystones.go.

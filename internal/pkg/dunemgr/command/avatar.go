@@ -11,7 +11,7 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 	"go.muehmer.eu/dapdsm/pkg/domain/avatar"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 const avatarUsage = `usage:
@@ -23,7 +23,7 @@ const avatarUsage = `usage:
 
 func avatarRunner(c *core.Core) *avatar.Runner {
 	return &avatar.Runner{
-		DB:      &dbquery.Runner{SSH: c.SSH, Store: c.Store},
+		DB:      &gamedb.Runner{SSH: c.SSH, Store: c.Store},
 		Store:   c.Store,
 		DataDir: filepath.Join(c.DataDir, "avatars"),
 	}
@@ -58,7 +58,7 @@ func avatarExport(ctx context.Context, c *core.Core, r *avatar.Runner, host stri
 		return fmt.Errorf("avatar export: usage: %w", ErrUsage)
 	}
 	useID := hasFlag(rest[1:], "--id")
-	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	dbr := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 	fls, err := resolvePlayerArg(ctx, dbr, host, rest[0], useID, stderr)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func avatarExport(ctx context.Context, c *core.Core, r *avatar.Runner, host stri
 
 // avatarListServer lists the joinable characters on host (server-side, read-only).
 func avatarListServer(ctx context.Context, c *core.Core, host string, stdout, stderr io.Writer) error {
-	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	dbr := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 	players, err := dbr.PlayerSearch(ctx, host, "%", 200)
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func avatarImport(ctx context.Context, c *core.Core, r *avatar.Runner, host stri
 	if err := fs.Parse(rest[2:]); err != nil {
 		return err
 	}
-	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	dbr := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 	fls, err := resolvePlayerArg(ctx, dbr, host, flsRef, *useID, stderr)
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func avatarTransfer(ctx context.Context, c *core.Core, r *avatar.Runner, src str
 	if err := fs.Parse(rest[2:]); err != nil {
 		return err
 	}
-	dbr := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	dbr := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 	fls, err := resolvePlayerArg(ctx, dbr, src, flsRef, *useID, stderr)
 	if err != nil {
 		return err
