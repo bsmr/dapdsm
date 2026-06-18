@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/avatar"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/avatar"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 
 const avatarUsage = `usage:

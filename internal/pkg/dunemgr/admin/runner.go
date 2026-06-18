@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
+	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 )
 
 // publisher is a narrow interface around mq.Publisher so Runner can be tested

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/battlegroup"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
+	"go.muehmer.eu/dapdsm/pkg/domain/battlegroup"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
 func TestBuildLifecycleView_Populated(t *testing.T) {

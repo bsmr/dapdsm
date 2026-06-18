@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
 func TestShutdownPartialFormWhenIdle(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 
 func TestFormatInspectIsTabular(t *testing.T) {

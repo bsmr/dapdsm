@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/kube"
+	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 )
 
 type preShutdownDeps struct {

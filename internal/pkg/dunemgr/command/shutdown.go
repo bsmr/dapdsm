@@ -7,8 +7,8 @@ import (
 	"io"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/lifecycle"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/schedule"
+	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
 )
 
 // shutdownCmd schedules, cancels, or queries a shutdown countdown on a host.

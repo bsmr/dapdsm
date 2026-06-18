@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/broadcast"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/lifecycle"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
+	"go.muehmer.eu/dapdsm/pkg/domain/broadcast"
+	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 // okRunner is an ssh.Runner that reports success for both Run and

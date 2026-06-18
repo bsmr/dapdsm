@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/auth"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
+	"go.muehmer.eu/dapdsm/pkg/domain/auth"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
 func TestAuditRouteShowsEntriesNewestFirst(t *testing.T) {

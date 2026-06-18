@@ -9,17 +9,17 @@ import (
 	"strings"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/auth"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/backup"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/broadcast"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/hostpool"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/lifecycle"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/schedule"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/sse"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/ui"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
+	"go.muehmer.eu/dapdsm/pkg/domain/auth"
+	"go.muehmer.eu/dapdsm/pkg/domain/backup"
+	"go.muehmer.eu/dapdsm/pkg/domain/broadcast"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/hostpool"
+	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 // Options configure server.New.

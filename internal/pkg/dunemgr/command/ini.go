@@ -9,7 +9,7 @@ import (
 	"text/tabwriter"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/gameini"
+	"go.muehmer.eu/dapdsm/pkg/domain/gameini"
 )
 
 func iniCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {

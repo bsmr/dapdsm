@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
+	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 )
 
 // recordingPublisher implements the publisher interface for test purposes.

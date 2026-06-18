@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 
 // resolvePlayerArg turns ref (a character name or a FLS id) into a FLS id for a

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"io"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/battlegroup"
-	"go.muehmer.eu/dapdsm/internal/pkg/kube"
+	"go.muehmer.eu/dapdsm/pkg/domain/battlegroup"
+	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 )
 
 type patchGamePortsDeps struct {

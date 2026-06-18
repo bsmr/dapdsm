@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/auth"
+	"go.muehmer.eu/dapdsm/pkg/domain/auth"
 )
 
 func TestDBColumnsRoute(t *testing.T) {

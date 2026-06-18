@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 
 // dbCmd runs a DB query (exec|columns|slow) against the BattleGroup database

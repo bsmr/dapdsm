@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
 func TestDashboardHasTabNav(t *testing.T) {

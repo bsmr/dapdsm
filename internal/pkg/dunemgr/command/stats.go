@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/stats"
+	"go.muehmer.eu/dapdsm/pkg/domain/stats"
 )
 
 func statsCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {

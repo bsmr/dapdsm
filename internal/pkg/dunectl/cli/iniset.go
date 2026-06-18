@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/iniconf"
+	"go.muehmer.eu/dapdsm/pkg/transport/iniconf"
 )
 
 // DefaultEngineINI is the Funcom-shipped INI file for battlegroup-wide

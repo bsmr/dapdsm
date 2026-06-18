@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
 // DefaultInterval is the v1 poll cadence.

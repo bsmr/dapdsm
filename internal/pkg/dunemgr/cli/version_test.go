@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/version"
+	"go.muehmer.eu/dapdsm/pkg/version"
 )
 
 func TestVersionCmdPrintsSharedIdentity(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"text/tabwriter"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 
 // playerCmd runs player-lookup sub-commands (search|pos|inspect) against the

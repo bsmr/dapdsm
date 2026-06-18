@@ -11,7 +11,7 @@ import (
 
 	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 
 func TestUpdateQuitsOnQ(t *testing.T) {

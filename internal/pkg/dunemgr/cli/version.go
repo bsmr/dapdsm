@@ -8,7 +8,7 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/config"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/version"
+	"go.muehmer.eu/dapdsm/pkg/version"
 )
 
 // versionCmd prints the dunemgr build identity (shared dapdsm version package).

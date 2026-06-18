@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/kube"
+	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 )
 
 // podStatus is the subset of a Pod's status we care about when deciding
