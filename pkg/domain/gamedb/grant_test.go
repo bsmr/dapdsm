@@ -1,4 +1,4 @@
-package dbquery
+package gamedb
 
 import (
 	"context"

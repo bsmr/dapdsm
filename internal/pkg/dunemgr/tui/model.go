@@ -27,7 +27,7 @@ import (
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
 	admincatalog "go.muehmer.eu/dapdsm/pkg/domain/catalog"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 // mode is the input mode of the TUI.
@@ -88,21 +88,21 @@ type playerNamesMsg struct {
 
 // playersMsg delivers the player list fetched when descending into levelPlayers.
 type playersMsg struct {
-	players []dbquery.Player
+	players []gamedb.Player
 	err     string
 }
 
 // invsMsg delivers the inventory breakdown fetched when descending into levelInventory.
 type invsMsg struct {
 	fls, char string
-	invs      []dbquery.InvBreakdown
+	invs      []gamedb.InvBreakdown
 	err       string
 }
 
 // itemsMsg delivers the item list fetched when descending into levelItem.
 type itemsMsg struct {
 	typ   int
-	items []dbquery.ItemRow
+	items []gamedb.ItemRow
 	err   string
 }
 
@@ -139,9 +139,9 @@ type model struct {
 
 	// modal nav state
 	nav     navState
-	players []dbquery.Player
-	invs    []dbquery.InvBreakdown
-	items   []dbquery.ItemRow
+	players []gamedb.Player
+	invs    []gamedb.InvBreakdown
+	items   []gamedb.ItemRow
 	curFLS  string
 	curChar string
 	curType int
@@ -229,7 +229,7 @@ func (m model) fetchPlayerNames(host string) tea.Cmd {
 		if c == nil {
 			return playerNamesMsg{host: host}
 		}
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		players, err := r.PlayerSearch(ctx, host, "%", 200)
 		if err != nil {
 			return playerNamesMsg{host: host}
@@ -251,7 +251,7 @@ func (m model) loadPlayers() tea.Cmd {
 		if c == nil || host == "" {
 			return playersMsg{err: "load players failed"}
 		}
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		ps, err := r.PlayerSearch(ctx, host, "%", 200)
 		if err != nil {
 			return playersMsg{err: "load players failed"}
@@ -272,7 +272,7 @@ func (m model) loadInvs() tea.Cmd {
 		if c == nil || ref == "" {
 			return invsMsg{err: "player not found / load failed"}
 		}
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		bs, err := r.InventoryBreakdown(ctx, host, ref)
 		if err != nil {
 			return invsMsg{err: "load inventories failed"}
@@ -288,7 +288,7 @@ func (m model) loadItems() tea.Cmd {
 		if c == nil || fls == "" {
 			return itemsMsg{typ: typ, err: "load items failed"}
 		}
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		rows, err := r.InventoryItems(ctx, host, fls, typ)
 		if err != nil {
 			return itemsMsg{typ: typ, err: "load items failed"}
@@ -314,7 +314,7 @@ func (m model) applyStack(itemID, stack int64) tea.Cmd {
 		if c == nil {
 			return editDoneMsg{}
 		}
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		return editDoneMsg{err: command.ApplyItemStack(ctx, r, c.Store, host, itemID, stack, false)}
 	}
 }
@@ -326,7 +326,7 @@ func (m model) applyQuality(itemID, q int64) tea.Cmd {
 		if c == nil {
 			return editDoneMsg{}
 		}
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		return editDoneMsg{err: command.ApplyItemQuality(ctx, r, c.Store, host, itemID, q, false)}
 	}
 }
@@ -338,7 +338,7 @@ func (m model) applyDelete(itemID int64) tea.Cmd {
 		if c == nil {
 			return editDoneMsg{}
 		}
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		return editDoneMsg{err: command.ApplyItemDelete(ctx, r, c.Store, host, itemID, false)}
 	}
 }

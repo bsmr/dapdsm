@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
@@ -125,11 +125,11 @@ func TestPlayerSearchNoQueryListsAll(t *testing.T) {
 
 func TestPrintInspectRendersNewSections(t *testing.T) {
 	var b bytes.Buffer
-	d := &dbquery.PlayerDetail{
+	d := &gamedb.PlayerDetail{
 		FLSID: "FLS1", Found: true, CharacterName: "Stilgar", OnlineStatus: "Offline",
-		Progression: &dbquery.Progression{TotalSkillPoints: 42, UnspentSkillPoints: 7, TotalXPEarned: 12345, ActivePerks: 2},
-		Vitals:      &dbquery.Vitals{CurrentHealth: 150},
-		Spice:       &dbquery.SpiceState{SystemStatus: "AddictionDisabled", SpiceVision: "FullyEnabled"},
+		Progression: &gamedb.Progression{TotalSkillPoints: 42, UnspentSkillPoints: 7, TotalXPEarned: 12345, ActivePerks: 2},
+		Vitals:      &gamedb.Vitals{CurrentHealth: 150},
+		Spice:       &gamedb.SpiceState{SystemStatus: "AddictionDisabled", SpiceVision: "FullyEnabled"},
 	}
 	printInspect(&b, d)
 	out := b.String()

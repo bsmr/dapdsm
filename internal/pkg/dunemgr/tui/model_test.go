@@ -11,7 +11,7 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
 	admincatalog "go.muehmer.eu/dapdsm/pkg/domain/catalog"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 func TestUpdateQuitsOnQ(t *testing.T) {
@@ -409,7 +409,7 @@ func TestLoadFailureSetsNavErr(t *testing.T) {
 
 func TestSelectedItemID(t *testing.T) {
 	m := newModel(context.Background(), nil)
-	m.items = []dbquery.ItemRow{{ID: 7}, {ID: 8}}
+	m.items = []gamedb.ItemRow{{ID: 7}, {ID: 8}}
 	m.nav.level = levelItem
 	m.nav.sel[levelItem] = 1
 	if got := m.selectedItemID(); got != 8 {
@@ -421,7 +421,7 @@ func TestItemDeleteConfirmFlow(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.hosts = []string{"vm-a"}
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{{ID: 8841, TemplateID: "Ammo", StackSize: 10}}
+	m.items = []gamedb.ItemRow{{ID: 8841, TemplateID: "Ammo", StackSize: 10}}
 	m.nav.counts[levelItem] = 1
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if !m2.(model).confirmDelete {
@@ -459,12 +459,12 @@ func TestItemsReloadKeepsCursor(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelItem
 	m.nav.sel[levelItem] = 2
-	m2, _ := m.Update(itemsMsg{items: []dbquery.ItemRow{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}}})
+	m2, _ := m.Update(itemsMsg{items: []gamedb.ItemRow{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}}})
 	if got := m2.(model).nav.sel[levelItem]; got != 2 {
 		t.Fatalf("sel=%d want 2 (kept on reload)", got)
 	}
 	// shrink → clamp
-	m3, _ := m2.(model).Update(itemsMsg{items: []dbquery.ItemRow{{ID: 1}}})
+	m3, _ := m2.(model).Update(itemsMsg{items: []gamedb.ItemRow{{ID: 1}}})
 	if got := m3.(model).nav.sel[levelItem]; got != 0 {
 		t.Fatalf("sel=%d want 0 (clamped after shrink)", got)
 	}
@@ -487,7 +487,7 @@ func TestDescendShowsLoadingNotStale(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.hosts = []string{"vm-a"}
 	m.nav.counts[levelHosts] = 1
-	m.players = []dbquery.Player{{CharacterName: "Stale"}}
+	m.players = []gamedb.Player{{CharacterName: "Stale"}}
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
 	mm := m2.(model)
 	if !mm.loading {
@@ -496,7 +496,7 @@ func TestDescendShowsLoadingNotStale(t *testing.T) {
 	if len(mm.players) != 0 {
 		t.Fatalf("stale players not cleared: %v", mm.players)
 	}
-	m3, _ := mm.Update(playersMsg{players: []dbquery.Player{{CharacterName: "Real"}}})
+	m3, _ := mm.Update(playersMsg{players: []gamedb.Player{{CharacterName: "Real"}}})
 	if m3.(model).loading {
 		t.Fatal("playersMsg must clear loading")
 	}
@@ -506,7 +506,7 @@ func TestItemEditRejectsNonNumeric(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.hosts = []string{"vm-a"}
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{{ID: 1, StackSize: 5}}
+	m.items = []gamedb.ItemRow{{ID: 1, StackSize: 5}}
 	m.nav.counts[levelItem] = 1
 	m.editing, m.editKind = true, editKindQty
 	m.input.SetValue("abc")
@@ -540,7 +540,7 @@ func TestModeIndicatorAndHelpOverlay(t *testing.T) {
 func TestItemRowsUseDisplayName(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{{ID: 1, TemplateID: "Ammo", StackSize: 5}}
+	m.items = []gamedb.ItemRow{{ID: 1, TemplateID: "Ammo", StackSize: 5}}
 	rows := m.levelRows()
 	if len(rows) != 1 || !strings.Contains(rows[0], admincatalog.DisplayName("Ammo")) {
 		t.Fatalf("item row must use the display name: %v", rows)
@@ -550,7 +550,7 @@ func TestItemRowsUseDisplayName(t *testing.T) {
 func TestStackClampAndRowMax(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{{ID: 1, TemplateID: "Radiation_Suit", StackSize: 1}} // stack_max 1
+	m.items = []gamedb.ItemRow{{ID: 1, TemplateID: "Radiation_Suit", StackSize: 1}} // stack_max 1
 	m.nav.counts[levelItem] = 1
 	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'+'}})
 	if cmd != nil || m2.(model).running {
@@ -570,7 +570,7 @@ func TestEditQtyRejectsOverMax(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.hosts = []string{"vm-a"}
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{{ID: 1, TemplateID: "Radiation_Suit", StackSize: 1}}
+	m.items = []gamedb.ItemRow{{ID: 1, TemplateID: "Radiation_Suit", StackSize: 1}}
 	m.nav.counts[levelItem] = 1
 	m.editing, m.editKind = true, editKindQty
 	m.input.SetValue("5")
@@ -602,7 +602,7 @@ func TestAddItemKeyAtPlayersLevel(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.hosts = []string{"vm-a"}
 	m.nav.level = levelPlayers
-	m.players = []dbquery.Player{{CharacterName: "Chani"}}
+	m.players = []gamedb.Player{{CharacterName: "Chani"}}
 	m.nav.counts[levelPlayers] = 1
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	if !strings.HasPrefix(m2.(model).input.Value(), "give item Chani ") {
@@ -652,7 +652,7 @@ func TestLevelHeaderPerLevel(t *testing.T) {
 	}
 
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{{ID: 1, TemplateID: "ZZZ_A", StackSize: 1}}
+	m.items = []gamedb.ItemRow{{ID: 1, TemplateID: "ZZZ_A", StackSize: 1}}
 	if h := m.levelHeader(); !strings.Contains(h, "ID") || !strings.Contains(h, "NAME") || !strings.Contains(h, "STACK") {
 		t.Fatalf("item header = %q", h)
 	}
@@ -661,7 +661,7 @@ func TestLevelHeaderPerLevel(t *testing.T) {
 func TestItemHeaderColumnsPresent(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{{ID: 1, TemplateID: "ZZZ_A", StackSize: 1}}
+	m.items = []gamedb.ItemRow{{ID: 1, TemplateID: "ZZZ_A", StackSize: 1}}
 	h := m.levelHeader()
 	for _, lbl := range []string{"ID", "NAME", "STACK", "MAX", "Q"} {
 		if !strings.Contains(h, lbl) {
@@ -674,7 +674,7 @@ func TestItemStackRightAlignedNoMaxBlank(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelItem
 	// ZZZ_* are non-catalog → StackMax 0 (blank MAX), DisplayName = id string.
-	m.items = []dbquery.ItemRow{
+	m.items = []gamedb.ItemRow{
 		{ID: 1, TemplateID: "ZZZ_AAAAAAAAAAAA", StackSize: 7},
 		{ID: 2, TemplateID: "ZZZ_BBBBBBBBBBBB", StackSize: 1234},
 	}
@@ -691,7 +691,7 @@ func TestItemStackRightAlignedNoMaxBlank(t *testing.T) {
 func TestItemHeaderAlignsWithRowColumns(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{
+	m.items = []gamedb.ItemRow{
 		{ID: 1494806, TemplateID: "ZZZ_TMPL_AAA", StackSize: 1},
 		{ID: 1496771, TemplateID: "ZZZ_TMPL_BBB", StackSize: 12345678},
 	}
@@ -744,7 +744,7 @@ func TestFooterShowsDismissHintOnOutput(t *testing.T) {
 	}
 }
 
-func names(ps []dbquery.Player) []string {
+func names(ps []gamedb.Player) []string {
 	out := make([]string, len(ps))
 	for i, p := range ps {
 		out[i] = p.CharacterName
@@ -755,7 +755,7 @@ func names(ps []dbquery.Player) []string {
 func TestSortPlayersByNameAscDesc(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelPlayers
-	m.players = []dbquery.Player{
+	m.players = []gamedb.Player{
 		{CharacterName: "Charlie"}, {CharacterName: "alice"}, {CharacterName: "Bob"},
 	}
 	m.applySort()
@@ -773,7 +773,7 @@ func TestSortItemsByStackNumeric(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelItem
 	m.sortCol[levelItem] = 2 // STACK
-	m.items = []dbquery.ItemRow{
+	m.items = []gamedb.ItemRow{
 		{ID: 1, StackSize: 44}, {ID: 2, StackSize: 1000}, {ID: 3, StackSize: 7},
 	}
 	m.applySort()
@@ -785,7 +785,7 @@ func TestSortItemsByStackNumeric(t *testing.T) {
 func TestSKeyCyclesSortableColumnsSkippingMax(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelItem
-	m.items = []dbquery.ItemRow{{ID: 1, StackSize: 1}}
+	m.items = []gamedb.ItemRow{{ID: 1, StackSize: 1}}
 	seen := map[int]bool{}
 	for i := 0; i < 4; i++ {
 		m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
@@ -803,7 +803,7 @@ func TestSKeyCyclesSortableColumnsSkippingMax(t *testing.T) {
 func TestShiftSKeyTogglesDirection(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelPlayers
-	m.players = []dbquery.Player{{CharacterName: "a"}, {CharacterName: "b"}}
+	m.players = []gamedb.Player{{CharacterName: "a"}, {CharacterName: "b"}}
 	before := m.sortDesc[levelPlayers]
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
 	if m2.(model).sortDesc[levelPlayers] == before {
@@ -814,7 +814,7 @@ func TestShiftSKeyTogglesDirection(t *testing.T) {
 func TestPlayersMsgLandsSorted(t *testing.T) {
 	m := newModel(context.Background(), nil)
 	m.nav.level = levelPlayers
-	m2, _ := m.Update(playersMsg{players: []dbquery.Player{
+	m2, _ := m.Update(playersMsg{players: []gamedb.Player{
 		{CharacterName: "zoe"}, {CharacterName: "amy"},
 	}})
 	if m2.(model).players[0].CharacterName != "amy" {

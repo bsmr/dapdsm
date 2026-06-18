@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
@@ -63,7 +63,7 @@ func PersonaName(name string) string {
 // Persona seeds reserved sender identities into the DB so whispers can carry a real
 // (non-spoofed) sender. Idempotent.
 type Persona struct {
-	DB    *dbquery.Runner
+	DB    *gamedb.Runner
 	Store *store.Store
 }
 
@@ -74,7 +74,7 @@ func (p *Persona) Seed(ctx context.Context, operator, host, name string) error {
 	if !ok {
 		return fmt.Errorf("unknown persona %q (want GM|Server)", name)
 	}
-	seed := dbquery.PersonaSeed{
+	seed := gamedb.PersonaSeed{
 		AccountID:       spec.AccountID,
 		ControllerID:    spec.AccountID*100 + 1,
 		StateID:         spec.AccountID*100 + 2,

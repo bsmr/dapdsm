@@ -1,4 +1,4 @@
-package dbquery
+package gamedb
 
 // vendored: see charxp_data.go
 

@@ -9,7 +9,7 @@ import (
 	"text/tabwriter"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 // playerCmd runs player-lookup sub-commands (search|pos|inspect) against the
@@ -22,7 +22,7 @@ func playerCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr 
 		return fmt.Errorf("player: usage: %w", ErrUsage)
 	}
 	host, sub, rest := args[0], args[1], args[2:]
-	r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+	r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 	switch sub {
 	case "search":
 		query, limit := parseSearchArgs(rest) // empty query → PlayerSearch lists all (%)
@@ -123,7 +123,7 @@ func parseSearchArgs(args []string) (query string, limit int) {
 }
 
 // printPlayers renders a tabular view of the search results to w.
-func printPlayers(w io.Writer, players []dbquery.Player) {
+func printPlayers(w io.Writer, players []gamedb.Player) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "FLS-ID\tNAME\tSTATUS\tLAST-SEEN")
 	for _, p := range players {
@@ -135,7 +135,7 @@ func printPlayers(w io.Writer, players []dbquery.Player) {
 
 // printInspect renders a player detail to w. It delegates the main body to
 // FormatInspect and appends the RawComponents block when present.
-func printInspect(w io.Writer, d *dbquery.PlayerDetail) {
+func printInspect(w io.Writer, d *gamedb.PlayerDetail) {
 	fmt.Fprint(w, FormatInspect(d))
 	if d != nil && d.RawComponents != "" {
 		fmt.Fprintf(w, "  raw components:\n%s\n", d.RawComponents)
@@ -143,7 +143,7 @@ func printInspect(w io.Writer, d *dbquery.PlayerDetail) {
 }
 
 // printPos renders a position row to w.
-func printPos(w io.Writer, pos *dbquery.Pos) {
+func printPos(w io.Writer, pos *gamedb.Pos) {
 	fmt.Fprintf(w, "x=%.3f  y=%.3f  z=%.3f\n", pos.X, pos.Y, pos.Z)
 	dim := "-"
 	if pos.Dimension != nil {

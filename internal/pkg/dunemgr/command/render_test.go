@@ -5,14 +5,14 @@ import (
 	"testing"
 
 	admincatalog "go.muehmer.eu/dapdsm/pkg/domain/catalog"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
 func TestFormatInspectIsTabular(t *testing.T) {
-	d := &dbquery.PlayerDetail{
+	d := &gamedb.PlayerDetail{
 		FLSID: "FLS1", Found: true, CharacterName: "Stilgar", OnlineStatus: "Offline",
-		Progression: &dbquery.Progression{TotalSkillPoints: 42, UnspentSkillPoints: 7},
-		Vitals:      &dbquery.Vitals{CurrentHealth: 150},
+		Progression: &gamedb.Progression{TotalSkillPoints: 42, UnspentSkillPoints: 7},
+		Vitals:      &gamedb.Vitals{CurrentHealth: 150},
 	}
 	out := FormatInspect(d)
 	for _, want := range []string{"Stilgar", "skill points", "42", "health", "150"} {
@@ -23,16 +23,16 @@ func TestFormatInspectIsTabular(t *testing.T) {
 }
 
 func TestFormatInspectNotFound(t *testing.T) {
-	out := FormatInspect(&dbquery.PlayerDetail{FLSID: "X"})
+	out := FormatInspect(&gamedb.PlayerDetail{FLSID: "X"})
 	if !strings.Contains(out, "no player") {
 		t.Fatalf("expected not-found line: %q", out)
 	}
 }
 
 func TestFormatInspectNumbersInventories(t *testing.T) {
-	d := &dbquery.PlayerDetail{
+	d := &gamedb.PlayerDetail{
 		Found: true, CharacterName: "Mal", FLSID: "DEADBEEF",
-		Inventories: []dbquery.InvBreakdown{{InventoryType: 3, ItemCount: 42}, {InventoryType: 7, ItemCount: 8}},
+		Inventories: []gamedb.InvBreakdown{{InventoryType: 3, ItemCount: 42}, {InventoryType: 7, ItemCount: 8}},
 	}
 	out := FormatInspect(d)
 	if !strings.Contains(out, "[1] type 3") || !strings.Contains(out, "[2] type 7") {
@@ -41,7 +41,7 @@ func TestFormatInspectNumbersInventories(t *testing.T) {
 }
 
 func TestFormatInventoryItems(t *testing.T) {
-	rows := []dbquery.ItemRow{{ID: 8841, TemplateID: "Spice", StackSize: 120, Quality: 5}}
+	rows := []gamedb.ItemRow{{ID: 8841, TemplateID: "Spice", StackSize: 120, Quality: 5}}
 	out := FormatInventoryItems(3, rows)
 	if !strings.Contains(out, "[1]") || !strings.Contains(out, "id=8841") || !strings.Contains(out, "Spice") {
 		t.Fatalf("item listing wrong:\n%s", out)
@@ -49,7 +49,7 @@ func TestFormatInventoryItems(t *testing.T) {
 }
 
 func TestFormatInventoryItemsUsesDisplayName(t *testing.T) {
-	rows := []dbquery.ItemRow{{ID: 1, TemplateID: "Ammo", StackSize: 5, Quality: 0}}
+	rows := []gamedb.ItemRow{{ID: 1, TemplateID: "Ammo", StackSize: 5, Quality: 0}}
 	out := FormatInventoryItems(0, rows)
 	if !strings.Contains(out, admincatalog.DisplayName("Ammo")) {
 		t.Fatalf("display name not used:\n%s", out)

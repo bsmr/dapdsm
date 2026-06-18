@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
@@ -21,7 +21,7 @@ const itemUsage = `usage:
 Edits target a single dune.items row by id (offline player only; --force to
 override an online/unknown owner). Find ids via: dunemgr player <host> inspect <name> --inv <type>.`
 
-// itemMutator is the dbquery surface the item-edit path needs; *dbquery.Runner
+// itemMutator is the gamedb surface the item-edit path needs; *gamedb.Runner
 // satisfies it. Sharing this interface lets the CLI verb and the TUI use one
 // gated apply path, and makes that path unit-testable with a fake.
 type itemMutator interface {
@@ -165,7 +165,7 @@ func itemCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io
 			fmt.Fprintln(stderr, "item set: --qty and --quality must be >= 0")
 			return fmt.Errorf("item set: negative value: %w", ErrUsage)
 		}
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		if !*confirm {
 			fmt.Fprintf(stdout, "item set: dry-run — would set")
 			if setQty {
@@ -190,7 +190,7 @@ func itemCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io
 		fmt.Fprintf(stdout, "item %d updated\n", itemID)
 		return nil
 	case "delete":
-		r := &dbquery.Runner{SSH: c.SSH, Store: c.Store}
+		r := &gamedb.Runner{SSH: c.SSH, Store: c.Store}
 		if !*confirm {
 			fmt.Fprintln(stdout, "item delete: dry-run (pass --confirm to apply)")
 			return nil
