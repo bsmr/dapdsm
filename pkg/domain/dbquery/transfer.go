@@ -41,10 +41,7 @@ func (r *Runner) PatchesChecksum(ctx context.Context, host string) (string, erro
 // "" if no such player exists. Used as the default import name (the in-dump
 // character name is encrypted and not recoverable).
 func (r *Runner) CharacterName(ctx context.Context, host, fls string) (string, error) {
-	const sql = onErrorStop + `SELECT COALESCE(ps.character_name,'')
-FROM dune.player_state ps
-JOIN dune.accounts a ON a.id = ps.account_id
-WHERE a."user"::text = :'fls' LIMIT 1;`
+	sql := onErrorStop + q("transfer_read")
 	res, err := r.execWithVars(ctx, host, sql, map[string]string{"fls": fls})
 	if err != nil {
 		return "", fmt.Errorf("character name: %w", err)

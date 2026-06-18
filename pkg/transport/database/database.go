@@ -71,20 +71,6 @@ func ResolveCreds(ctx context.Context, runner kube.Runner, ns string) (Creds, er
 	}, nil
 }
 
-// initGameUserSQL is the idempotent block that creates the per-app
-// Postgres role and database the Funcom database-operator's util-pod
-// expects to exist before it can initialise the schema. Aligns the
-// super-user password too, in case it was rotated out of band.
-// Variables are bound via psql's -v flag rather than string interpolation
-// so values containing quote characters do not break the statement.
-const initGameUserSQL = `SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'db_user', :'db_password')
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user') \gexec
-ALTER ROLE :"db_user" WITH LOGIN PASSWORD :'db_password';
-SELECT format('CREATE DATABASE %I OWNER %I', :'db_name', :'db_user')
-WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'db_name') \gexec
-ALTER ROLE :"super_user" WITH PASSWORD :'super_password';
-`
-
 // InitGameUser provisions the per-app Postgres role and database the
 // Funcom database-operator's util-pod requires before it can initialise
 // the schema. Idempotent — re-running on an already-initialised BG is
@@ -99,7 +85,7 @@ func InitGameUser(ctx context.Context, runner kube.Runner, ns string, creds Cred
 	if creds.GameUser == "" || creds.GamePassword == "" || creds.Database == "" {
 		return fmt.Errorf("InitGameUser: missing GameUser/GamePassword/Database in Creds")
 	}
-	_, err := runner.ExecPiped(ctx, ns, creds.Pod, []byte(initGameUserSQL),
+	_, err := runner.ExecPiped(ctx, ns, creds.Pod, []byte(q("init_game_user")),
 		"env", "PGPASSWORD="+creds.SuperPassword,
 		"psql",
 		"-h", "127.0.0.1",

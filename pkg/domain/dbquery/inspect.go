@@ -89,11 +89,7 @@ func (r *Runner) PlayerInspect(ctx context.Context, host, fls string, topN int, 
 	d := &PlayerDetail{FLSID: fls}
 	vars := map[string]string{"fls": fls}
 
-	const headerSQL = `SELECT COALESCE(ps.character_name,''), COALESCE(ps.online_status::text,''),
-       COALESCE(to_char(ps.last_avatar_activity AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'),''),
-       COALESCE(ps.previous_server_partition_id::text,'')
-FROM dune.player_state ps JOIN dune.accounts a ON a.id = ps.account_id
-WHERE a."user"::text = :'fls' LIMIT 1;`
+	headerSQL := q("inspect_header")
 	hres, err := r.execWithVars(ctx, host, headerSQL, vars)
 	if err != nil {
 		return nil, fmt.Errorf("player inspect header: %w", err)
@@ -165,13 +161,7 @@ ORDER BY i.quality_level DESC, i.stack_size DESC LIMIT :lim;`
 	}
 
 	// execWithVars #5: character components (one jsonb line) for progression/vitals/spice.
-	const componentsSQL = `SELECT fe.components
-FROM dune.fgl_entities fe
-JOIN dune.actor_fgl_entities afe ON afe.entity_id = fe.entity_id
-JOIN dune.player_state ps ON ps.player_pawn_id = afe.actor_id
-JOIN dune.accounts a ON a.id = ps.account_id
-WHERE a."user"::text = :'fls' AND afe.slot_name = 'DuneCharacter'
-LIMIT 1;`
+	componentsSQL := q("inspect_components")
 	cres, err := r.execWithVars(ctx, host, componentsSQL, vars)
 	if err != nil {
 		return nil, fmt.Errorf("player inspect components: %w", err)
