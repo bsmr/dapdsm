@@ -2,7 +2,11 @@
 # Host-specific values (TLS SANs) live in a drop-in under config.yaml.d/.
 # K3s reads this file at service start; no installer flags needed.
 
-write-kubeconfig-mode: "0644"
+# Owner-only: the admin kubeconfig at /etc/rancher/k3s/k3s.yaml is
+# cluster-admin. All tooling (ds-arrakis, dunectl, the bootstrap path)
+# reads it via sudo (root), so 0600 is sufficient; 0644 would make
+# cluster-admin credentials world-readable on the node.
+write-kubeconfig-mode: "0600"
 
 disable:
   - traefik
