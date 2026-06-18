@@ -12,14 +12,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/schedule"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/sse"
 	"go.muehmer.eu/dapdsm/pkg/domain/broadcast"
 	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
 	"go.muehmer.eu/dapdsm/pkg/domain/probe"
+	"go.muehmer.eu/dapdsm/pkg/domain/schedule"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
+
+// ssePub adapts an *sse.Hub to schedule.EventPublisher.
+type ssePub struct{ h *sse.Hub }
+
+func (s ssePub) Publish(topic, data string) { s.h.Publish(topic, sse.Event{Data: data}) }
 
 // Core holds the shared dependencies and background routines. Fields are
 // exported so tests may construct a partial Core literal directly.
@@ -97,7 +102,7 @@ func Open(getenv func(string) string) (*Core, error) {
 	mgr := schedule.NewManager(
 		&broadcast.Runner{SSH: sshClient, Store: st},
 		&lifecycle.Runner{SSH: sshClient, Store: st},
-		st, hub,
+		st, ssePub{hub},
 	)
 	return &Core{
 		Dir:       dir,

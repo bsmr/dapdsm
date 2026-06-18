@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/schedule"
 	"go.muehmer.eu/dapdsm/pkg/domain/broadcast"
 	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
+	"go.muehmer.eu/dapdsm/pkg/domain/schedule"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )

@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/sse"
 	"go.muehmer.eu/dapdsm/pkg/domain/broadcast"
 	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
@@ -28,20 +27,26 @@ type Request struct {
 	BroadcastDuration  int
 }
 
+// EventPublisher receives schedule action events. Implemented by the host
+// process (e.g. an sse.Hub adapter); nil disables publishing.
+type EventPublisher interface {
+	Publish(topic, data string)
+}
+
 // Manager arms per-host countdown timers and persists them.
 type Manager struct {
 	bc    *broadcast.Runner
 	lc    *lifecycle.Runner
 	store *store.Store
-	hub   *sse.Hub // optional; nil ok
+	pub   EventPublisher // optional; nil ok
 
 	mu     sync.Mutex
 	timers map[string]*time.Timer
 }
 
-// NewManager wires the runners + store (+ optional SSE hub).
-func NewManager(bc *broadcast.Runner, lc *lifecycle.Runner, st *store.Store, hub *sse.Hub) *Manager {
-	return &Manager{bc: bc, lc: lc, store: st, hub: hub, timers: map[string]*time.Timer{}}
+// NewManager wires the runners + store (+ optional EventPublisher).
+func NewManager(bc *broadcast.Runner, lc *lifecycle.Runner, st *store.Store, pub EventPublisher) *Manager {
+	return &Manager{bc: bc, lc: lc, store: st, pub: pub, timers: map[string]*time.Timer{}}
 }
 
 // Schedule announces a shutdown, persists it, and arms the timer.
@@ -171,13 +176,13 @@ func (m *Manager) executeShutdown(ctx context.Context, host string) {
 	m.notify(host, "shutdown.executed", lifecycle.Action(rec.Action), rec.Operator)
 }
 
-// notify publishes a best-effort SSE actions event (no-op if hub nil).
+// notify publishes a best-effort actions event (no-op if pub nil).
 func (m *Manager) notify(host, action string, verb lifecycle.Action, operator string) {
-	if m.hub == nil {
+	if m.pub == nil {
 		return
 	}
 	data, _ := json.Marshal(map[string]string{
 		"action": action, "result": string(verb), "operator": operator,
 	})
-	m.hub.Publish("actions/"+host, sse.Event{Data: string(data)})
+	m.pub.Publish("actions/"+host, string(data))
 }
