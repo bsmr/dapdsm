@@ -6,7 +6,7 @@ import (
 	"text/tabwriter"
 
 	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 
 // inventoryTypeNames maps Funcom's raw dune.inventories.inventory_type integer

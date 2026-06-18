@@ -9,8 +9,8 @@ import (
 	"os"
 	"os/exec"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/kube"
-	"go.muehmer.eu/dapdsm/internal/pkg/publicip"
+	"go.muehmer.eu/dapdsm/pkg/transport/kube"
+	"go.muehmer.eu/dapdsm/pkg/transport/publicip"
 )
 
 // DefaultSettingsConf is the path Funcom's vendor scripts read at server-pod

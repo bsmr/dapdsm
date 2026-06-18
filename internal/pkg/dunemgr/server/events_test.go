@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/auth"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/sse"
+	"go.muehmer.eu/dapdsm/pkg/domain/auth"
 )
 
 func TestEventsBGStreamsPublishedEvent(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"io"
 	"os"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/backup"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/pkg/domain/backup"
 )
 
 // backupCmd creates, lists, or restores BattleGroup DB backups on a host.

@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/broadcast"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/lifecycle"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/sse"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
+	"go.muehmer.eu/dapdsm/pkg/domain/broadcast"
+	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
 )
 
 // Request is the operator-supplied parameters for a countdown.

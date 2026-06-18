@@ -8,8 +8,8 @@ import (
 	"io"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/broadcast"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
+	"go.muehmer.eu/dapdsm/pkg/domain/broadcast"
 )
 
 // broadcastCmd publishes an in-game notice or shutdown announcement

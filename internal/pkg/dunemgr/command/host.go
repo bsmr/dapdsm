@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/hostpool"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/probe"
+	"go.muehmer.eu/dapdsm/pkg/domain/hostpool"
+	"go.muehmer.eu/dapdsm/pkg/domain/probe"
 )
 
 // hostCmd manages the host pool (list|add|rm|probe).

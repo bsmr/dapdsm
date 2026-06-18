@@ -10,8 +10,8 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/mq"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 )
 
 // adminCmd dispatches in-game admin commands to the BattleGroup MQ broker.

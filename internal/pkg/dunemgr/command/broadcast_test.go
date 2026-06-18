@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 func TestBroadcastUsage(t *testing.T) {

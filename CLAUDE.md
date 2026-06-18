@@ -48,8 +48,16 @@ reachable from the same version's branch here.
 ```text
 .
 ├── cmd/<appname>/        # Go CLI entry points (one subdir per binary)
+├── pkg/
+│   ├── transport/        # Tool-agnostic mechanics (ssh, kube, iniconf, database, publicip), all kubectl-exec based.
+│   ├── domain/           # Dune semantics composing transport (battlegroup, store, avatar, backup, broadcast,
+│   │                     #   dbquery, gameini, grant, hostpool, lifecycle, mq, probe, stats, auth; market reserved).
+│   │                     #   Tools call this layer.
+│   └── version/          # Shared version info.
 ├── internal/
-│   └── pkg/<name>/       # Go library packages (all business logic)
+│   └── pkg/              # Tool-bound packages that remain private:
+│       ├── dunectl/      #   dunectl/{cli,config}
+│       └── dunemgr/      #   dunemgr/{cli,core,command,tui,ui,sse,server,admin,schedule,config}
 ├── etc/                  # Operator config templates (synced to /opt/dapdsm/etc on the host, served as /etc/dune/ samples)
 │   └── dune/
 ├── scripts/              # Operator helpers (build, deploy)
@@ -105,8 +113,8 @@ func run() error {
 ```
 
 - `main()` only calls `run()` and handles `os.Exit` — never call `os.Exit` from `run()`.
-- `run()` is **wiring only**: creates context, signal handling, delegates to `internal/pkg/`.
-- Application logic lives in `internal/pkg/<name>/` packages; all I/O is injected (`context.Context`, `args []string`, `stdin io.Reader`, `stdout io.Writer`, `stderr io.Writer`).
+- `run()` is **wiring only**: creates context, signal handling, delegates to `pkg/` or `internal/pkg/`.
+- SDK logic lives in `pkg/transport/` and `pkg/domain/`; tool-bound logic stays in `internal/pkg/<name>/`; all I/O is injected (`context.Context`, `args []string`, `stdin io.Reader`, `stdout io.Writer`, `stderr io.Writer`).
 - Every package has a `_test.go` with meaningful coverage. Write tests first, then implement.
 - Build output always to `bin/`; `bin/` is gitignored.
 

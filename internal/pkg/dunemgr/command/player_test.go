@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 func TestPlayerNoArgs(t *testing.T) {

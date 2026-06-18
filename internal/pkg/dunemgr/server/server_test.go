@@ -10,14 +10,14 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/battlegroup"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/auth"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/backup"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/lifecycle"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/sse"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
+	"go.muehmer.eu/dapdsm/pkg/domain/auth"
+	"go.muehmer.eu/dapdsm/pkg/domain/backup"
+	"go.muehmer.eu/dapdsm/pkg/domain/battlegroup"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 // recordingSSHRunner is a fake ssh.Runner that returns canned success

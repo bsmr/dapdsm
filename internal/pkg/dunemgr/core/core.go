@@ -12,13 +12,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/broadcast"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/lifecycle"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/probe"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/schedule"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/sse"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/store"
-	"go.muehmer.eu/dapdsm/internal/pkg/ssh"
+	"go.muehmer.eu/dapdsm/pkg/domain/broadcast"
+	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
+	"go.muehmer.eu/dapdsm/pkg/domain/probe"
+	"go.muehmer.eu/dapdsm/pkg/domain/store"
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 // Core holds the shared dependencies and background routines. Fields are

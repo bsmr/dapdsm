@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/auth"
+	"go.muehmer.eu/dapdsm/pkg/domain/auth"
 )
 
 func TestDBSchemaRoute(t *testing.T) {

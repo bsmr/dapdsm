@@ -27,7 +27,7 @@ import (
 	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/dbquery"
+	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 
 // mode is the input mode of the TUI.

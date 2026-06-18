@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"io"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/battlegroup"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunectl/config"
-	"go.muehmer.eu/dapdsm/internal/pkg/kube"
-	"go.muehmer.eu/dapdsm/internal/pkg/publicip"
+	"go.muehmer.eu/dapdsm/pkg/domain/battlegroup"
+	"go.muehmer.eu/dapdsm/pkg/transport/kube"
+	"go.muehmer.eu/dapdsm/pkg/transport/publicip"
 )
 
 // patchBgDeps groups the external dependencies of patchBattlegroup so

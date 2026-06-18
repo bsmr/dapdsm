@@ -9,9 +9,9 @@ import (
 	"io"
 	"strings"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/battlegroup"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunectl/database"
-	"go.muehmer.eu/dapdsm/internal/pkg/kube"
+	"go.muehmer.eu/dapdsm/pkg/domain/battlegroup"
+	"go.muehmer.eu/dapdsm/pkg/transport/database"
+	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 )
 
 type setScalingDeps struct {

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/version"
+	"go.muehmer.eu/dapdsm/pkg/version"
 )
 
 func versionCmd(_ context.Context, args []string, stdout, stderr io.Writer) error {

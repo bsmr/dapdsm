@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/core"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/lifecycle"
+	"go.muehmer.eu/dapdsm/pkg/domain/lifecycle"
 )
 
 // lifecycleCmd drives a BattleGroup lifecycle verb (start|stop|restart|update)

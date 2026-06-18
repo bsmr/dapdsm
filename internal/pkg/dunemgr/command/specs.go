@@ -5,7 +5,7 @@ import (
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin"
 	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
-	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/gameini"
+	"go.muehmer.eu/dapdsm/pkg/domain/gameini"
 )
 
 // argKind classifies a positional argument for completion + help.
