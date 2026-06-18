@@ -28,10 +28,7 @@ var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,62}$`)
 // information_schema; no audit entry (catalog browse is framework
 // activity, not operator action).
 func (r *Runner) Tables(ctx context.Context, host string) ([]Table, error) {
-	const sql = `SELECT table_schema, table_name
-		FROM information_schema.tables
-		WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-		ORDER BY table_schema, table_name;`
+	sql := q("schema_tables")
 	res, err := r.execNoAudit(ctx, host, sql)
 	if err != nil {
 		return nil, err

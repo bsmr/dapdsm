@@ -19,17 +19,7 @@ type CharXPResult struct {
 // verified flow (readCharXPState + keystoneSPBonus + computeAwardCharXPOutcome +
 // applyAwardCharXPFLevelUpdate + intel). DB-only; the caller gates on offline.
 func (r *Runner) GrantCharXP(ctx context.Context, host, fls string, amount int64) (CharXPResult, error) {
-	const readSQL = `SELECT
-  (fe.components->'FLevelComponent'->1->>'TotalXPEarned')::bigint,
-  COALESCE((SELECT SUM((v->>'SkillPointsSpent')::int)
-     FROM jsonb_each(fe.components->'FLevelComponent'->1->'ModuleData') AS kv(k, v)
-     WHERE k != format('(TagName="%s")', fe.components->'FLevelComponent'->1->'StarterSkillTreeTag'->>'TagName')), 0),
-  ps.player_pawn_id, ps.player_controller_id
-FROM dune.fgl_entities fe
-JOIN dune.actor_fgl_entities afe ON afe.entity_id = fe.entity_id
-JOIN dune.player_state ps ON ps.player_pawn_id = afe.actor_id
-JOIN dune.accounts a ON a.id = ps.account_id
-WHERE afe.slot_name = 'DuneCharacter' AND a."user"::text = :'fls' ORDER BY afe.entity_id DESC LIMIT 1;`
+	readSQL := q("charxp_read")
 	res, err := r.execWithVars(ctx, host, readSQL, map[string]string{"fls": fls})
 	if err != nil {
 		return CharXPResult{}, fmt.Errorf("char xp: read state: %w", err)
@@ -62,19 +52,7 @@ WHERE afe.slot_name = 'DuneCharacter' AND a."user"::text = :'fls' ORDER BY afe.e
 
 	out := computeAwardCharXPOutcome(currentXP, spentSP, bonus, amount)
 
-	const applySQL = onErrorStop + `BEGIN;
-UPDATE dune.fgl_entities
-SET components = jsonb_set(jsonb_set(jsonb_set(components,
-    '{FLevelComponent,1,TotalXPEarned}',     to_jsonb(:newxp::bigint)),
-    '{FLevelComponent,1,TotalSkillPoints}',  to_jsonb(:newtotal::bigint)),
-    '{FLevelComponent,1,UnspentSkillPoints}', to_jsonb(:newunspent::bigint))
-WHERE entity_id = (SELECT entity_id FROM dune.actor_fgl_entities
-                   WHERE actor_id = :pawn::bigint AND slot_name = 'DuneCharacter');
-UPDATE dune.actors
-SET properties = jsonb_set(properties,
-    '{TechKnowledgePlayerComponent,m_TechKnowledgePoints}', to_jsonb(:newintel::bigint))
-WHERE id = :pawn::bigint AND properties ? 'TechKnowledgePlayerComponent';
-COMMIT;`
+	applySQL := onErrorStop + q("charxp_apply")
 	_, err = r.execWithVars(ctx, host, applySQL, map[string]string{
 		"newxp":      strconv.FormatInt(out.newXP, 10),
 		"newtotal":   strconv.FormatInt(out.newTotalSP, 10),
@@ -94,7 +72,7 @@ func (r *Runner) charXPKeystoneBonus(ctx context.Context, host string, controlle
 	if controller == 0 {
 		return 0, nil
 	}
-	const sql = `SELECT keystone_id FROM dune.purchased_specialization_keystones WHERE player_id = :ctrl::bigint;`
+	sql := q("charxp_keystones")
 	res, err := r.execWithVars(ctx, host, sql, map[string]string{"ctrl": strconv.FormatInt(controller, 10)})
 	if err != nil {
 		return 0, fmt.Errorf("char xp: read keystones: %w", err)

@@ -1,0 +1,1 @@
+SELECT keystone_id FROM dune.purchased_specialization_keystones WHERE player_id = :ctrl::bigint;
