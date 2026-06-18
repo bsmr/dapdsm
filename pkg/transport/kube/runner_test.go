@@ -171,3 +171,42 @@ func TestFindBattleGroupNamespaceAcceptsGetter(t *testing.T) {
 		t.Errorf("ns = %q, want funcom-seabass-x", ns)
 	}
 }
+
+func TestCmdRunner_applyArgs_PrependsKubeconfigAndVerb(t *testing.T) {
+	t.Parallel()
+
+	// With kubeconfig set: expect --kubeconfig=<path>, then "apply", then user args.
+	c := &CmdRunner{Kubeconfig: "/run/kc"}
+	got := c.applyArgs("-f", "/tmp/crds")
+	want := []string{"--kubeconfig=/run/kc", "apply", "-f", "/tmp/crds"}
+	if len(got) != len(want) {
+		t.Fatalf("applyArgs len = %d, want %d; got %v", len(got), len(want), got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("applyArgs[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+
+	// Without kubeconfig: "apply" must be the first element.
+	c2 := &CmdRunner{}
+	got2 := c2.applyArgs("-f", "/tmp/crds")
+	want2 := []string{"apply", "-f", "/tmp/crds"}
+	if len(got2) != len(want2) {
+		t.Fatalf("applyArgs (no kc) len = %d, want %d; got %v", len(got2), len(want2), got2)
+	}
+	for i, w := range want2 {
+		if got2[i] != w {
+			t.Errorf("applyArgs (no kc)[%d] = %q, want %q", i, got2[i], w)
+		}
+	}
+}
+
+func TestCmdRunner_Apply_RunsSuccessfully(t *testing.T) {
+	t.Parallel()
+	// Bin "echo" exits 0, so Apply should return nil and exercise the exec path.
+	c := &CmdRunner{Bin: "echo", Kubeconfig: "/run/kc-vm-a"}
+	if err := c.Apply(context.Background(), "-f", "/tmp/crds"); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+}

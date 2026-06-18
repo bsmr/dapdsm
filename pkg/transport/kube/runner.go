@@ -129,6 +129,28 @@ func (c *CmdRunner) ExecPiped(ctx context.Context, namespace, pod string, stdin 
 	return out.Bytes(), nil
 }
 
+// applyArgs builds the full argument list for an apply invocation: globalArgs
+// followed by "apply" then any caller-supplied args.
+func (c *CmdRunner) applyArgs(args ...string) []string {
+	return append(c.globalArgs(), append([]string{"apply"}, args...)...)
+}
+
+// Apply runs `kubectl apply <args...>` (e.g. "-f", dir). Used by ds-arrakis
+// to install operator CRDs/RBAC. Method on CmdRunner only — the Runner
+// interface is intentionally not widened.
+func (c *CmdRunner) Apply(ctx context.Context, args ...string) error {
+	cmd := exec.CommandContext(ctx, c.kubectl(), c.applyArgs(args...)...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if c.Stderr != nil {
+		cmd.Stderr = io.MultiWriter(&stderr, c.Stderr)
+	}
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("kubectl apply: %w: %s", err, stderr.String())
+	}
+	return nil
+}
+
 // DeletePods deletes pods in namespace selected by the given label selectors.
 // Each selector is passed through as a -l argument.
 func (c *CmdRunner) DeletePods(ctx context.Context, namespace string, selectors ...string) error {
