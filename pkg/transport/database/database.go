@@ -6,12 +6,12 @@ package database
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
+	db "go.muehmer.eu/dapdsm/pkg/transport/db"
 	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 )
 
@@ -34,40 +34,18 @@ type Creds struct {
 // ResolveCreds reads the first DatabaseDeployment in namespace ns and
 // derives the StatefulSet pod 0 name plus connection parameters.
 func ResolveCreds(ctx context.Context, runner kube.Runner, ns string) (Creds, error) {
-	raw, err := runner.Get(ctx, "databasedeployment", "-n", ns, "-o", "json")
+	c, err := db.Resolve(ctx, runner, ns)
 	if err != nil {
-		return Creds{}, fmt.Errorf("get DatabaseDeployment: %w", err)
+		return Creds{}, err
 	}
-	var doc struct {
-		Items []struct {
-			Metadata struct {
-				Name string `json:"name"`
-			} `json:"metadata"`
-			Spec struct {
-				Port             int    `json:"port"`
-				SuperUser        string `json:"superUser"`
-				SuperPassword    string `json:"superPassword"`
-				User             string `json:"user"`
-				Password         string `json:"password"`
-				GameDatabaseName string `json:"gameDatabaseName"`
-			} `json:"spec"`
-		} `json:"items"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return Creds{}, fmt.Errorf("decode DatabaseDeployment: %w", err)
-	}
-	if len(doc.Items) == 0 {
-		return Creds{}, fmt.Errorf("no DatabaseDeployment in namespace %s", ns)
-	}
-	it := doc.Items[0]
 	return Creds{
-		Pod:           it.Metadata.Name + "-sts-0",
-		Port:          it.Spec.Port,
-		SuperUser:     it.Spec.SuperUser,
-		SuperPassword: it.Spec.SuperPassword,
-		GameUser:      it.Spec.User,
-		GamePassword:  it.Spec.Password,
-		Database:      it.Spec.GameDatabaseName,
+		Pod:           c.Pod,
+		Port:          c.Port,
+		SuperUser:     c.SuperUser,
+		SuperPassword: c.SuperPassword,
+		GameUser:      c.GameUser,
+		GamePassword:  c.GamePassword,
+		Database:      c.Database,
 	}, nil
 }
 
@@ -85,20 +63,23 @@ func InitGameUser(ctx context.Context, runner kube.Runner, ns string, creds Cred
 	if creds.GameUser == "" || creds.GamePassword == "" || creds.Database == "" {
 		return fmt.Errorf("InitGameUser: missing GameUser/GamePassword/Database in Creds")
 	}
-	_, err := runner.ExecPiped(ctx, ns, creds.Pod, []byte(q("init_game_user")),
-		"env", "PGPASSWORD="+creds.SuperPassword,
-		"psql",
-		"-h", "127.0.0.1",
-		"-p", strconv.Itoa(creds.Port),
-		"-U", creds.SuperUser,
-		"-d", "postgres",
-		"-v", "ON_ERROR_STOP=1",
-		"-v", "db_user="+creds.GameUser,
-		"-v", "db_password="+creds.GamePassword,
-		"-v", "db_name="+creds.Database,
-		"-v", "super_user="+creds.SuperUser,
-		"-v", "super_password="+creds.SuperPassword,
-	)
+	conn := &db.Conn{
+		Creds: db.Creds{Namespace: ns, Pod: creds.Pod, Port: creds.Port, SuperUser: creds.SuperUser, SuperPassword: creds.SuperPassword},
+		Exec:  db.NewKubeExecer(runner),
+	}
+	_, err := conn.Run(ctx, db.Query{
+		Database: "postgres",
+		Password: true,
+		Vars: []db.Var{
+			{Key: "ON_ERROR_STOP", Val: "1"},
+			{Key: "db_user", Val: creds.GameUser},
+			{Key: "db_password", Val: creds.GamePassword},
+			{Key: "db_name", Val: creds.Database},
+			{Key: "super_user", Val: creds.SuperUser},
+			{Key: "super_password", Val: creds.SuperPassword},
+		},
+		SQL: q("init_game_user"),
+	})
 	if err != nil {
 		return fmt.Errorf("psql InitGameUser: %w", err)
 	}
@@ -124,21 +105,16 @@ func LookupPartitionIDs(ctx context.Context, runner kube.Runner, ns string, cred
 		"SELECT map, partition_id FROM dune.world_partition WHERE map IN ('%s')",
 		strings.Join(maps, "','"),
 	)
-	out, err := runner.Exec(ctx, ns, creds.Pod,
-		"env", "PGPASSWORD="+creds.SuperPassword,
-		"psql",
-		"-h", "127.0.0.1",
-		"-p", strconv.Itoa(creds.Port),
-		"-U", creds.SuperUser,
-		"-d", creds.Database,
-		"-tA", "-F", "|",
-		"-c", sql,
-	)
+	conn := &db.Conn{
+		Creds: db.Creds{Namespace: ns, Pod: creds.Pod, Port: creds.Port, SuperUser: creds.SuperUser, SuperPassword: creds.SuperPassword, Database: creds.Database},
+		Exec:  db.NewKubeExecer(runner),
+	}
+	out, err := conn.Run(ctx, db.Query{Password: true, Tuples: true, Inline: sql})
 	if err != nil {
 		return nil, fmt.Errorf("psql world_partition lookup: %w", err)
 	}
 	got := make(map[string]int, len(maps))
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		if line == "" {
 			continue
 		}
