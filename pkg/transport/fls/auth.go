@@ -1,6 +1,6 @@
 // Package auth gates access to dunemgr's HTTP surface. v1 ships a
 // Token authenticator; v2 adds OIDC behind the same interface.
-package auth
+package fls
 
 import "net/http"
 

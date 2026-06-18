@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	lipgloss "github.com/charmbracelet/lipgloss"
 
-	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
 	"go.muehmer.eu/dapdsm/internal/pkg/dunemgr/command"
+	admincatalog "go.muehmer.eu/dapdsm/pkg/domain/catalog"
 	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 

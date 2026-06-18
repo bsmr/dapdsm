@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
+	admincatalog "go.muehmer.eu/dapdsm/pkg/domain/catalog"
 	"go.muehmer.eu/dapdsm/pkg/domain/dbquery"
 )
 

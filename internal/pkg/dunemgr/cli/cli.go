@@ -21,13 +21,6 @@ import (
 var ErrUsage = command.ErrUsage
 
 // Run dispatches args[0]. With no args it launches the TUI.
-//
-// The web UI is disabled as of 0.1.12: the serve, --print-token, and
-// regen-token verbs are deliberately not wired here, so they fall through to
-// the default branch and are rejected as unknown verbs. The serveCmd and
-// regenTokenCmd functions plus the server/ package and token code remain in the
-// tree, unreferenced, so a later cycle can re-enable the web UI by re-adding
-// these cases.
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	_ = stdin // reserved for future subcommands that read stdin
 	if len(args) == 0 {

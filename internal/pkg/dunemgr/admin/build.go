@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	admincatalog "go.muehmer.eu/dapdsm/internal/pkg/dunemgr/admin/catalog"
+	admincatalog "go.muehmer.eu/dapdsm/pkg/domain/catalog"
 )
 
 // Build constructs the inner-JSON string for a ServerCommand payload.
