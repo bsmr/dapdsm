@@ -1,0 +1,16 @@
+# Baseline K3s configuration deployed to /etc/rancher/k3s/config.yaml.
+# Host-specific values (TLS SANs) live in a drop-in under config.yaml.d/.
+# K3s reads this file at service start; no installer flags needed.
+
+write-kubeconfig-mode: "0644"
+
+disable:
+  - traefik
+
+# Kubelet tuning copied from the Funcom Hyper-V appliance:
+# - Keep large seabass-* images on disk (image-gc 99/98).
+# - Aggressive eviction thresholds matching the upstream profile.
+kubelet-arg:
+  - "eviction-hard=memory.available<100Mi,nodefs.available<1%,nodefs.inodesFree<1%,imagefs.available<1%,imagefs.inodesFree<1%"
+  - "image-gc-high-threshold=99"
+  - "image-gc-low-threshold=98"

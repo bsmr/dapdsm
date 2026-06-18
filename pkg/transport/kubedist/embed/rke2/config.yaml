@@ -1,0 +1,12 @@
+# ds-arrakis rke2 baseline — VERIFY on a real RKE2 host (see spec §11).
+
+disable:
+  - rke2-ingress-nginx
+
+# Kubelet tuning copied from the Funcom Hyper-V appliance:
+# - Keep large seabass-* images on disk (image-gc 99/98).
+# - Aggressive eviction thresholds matching the upstream profile.
+kubelet-arg:
+  - "eviction-hard=memory.available<100Mi,nodefs.available<1%,nodefs.inodesFree<1%,imagefs.available<1%,imagefs.inodesFree<1%"
+  - "image-gc-high-threshold=99"
+  - "image-gc-low-threshold=98"
