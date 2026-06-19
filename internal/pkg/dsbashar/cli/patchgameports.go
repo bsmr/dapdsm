@@ -41,7 +41,7 @@ func runPatchGamePorts(ctx context.Context, args []string, stdout, stderr io.Wri
 	gameBase := fs.Int("game-base", 0, "Game UDP base port (e.g. 7877). Required.")
 	igwBase := fs.Int("igw-base", 0, "IGW UDP base port (e.g. 7988). Required.")
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: dunectl patch-game-ports --game-base N --igw-base M\n\n")
+		fmt.Fprintf(stderr, "Usage: ds-bashar patch-game-ports --game-base N --igw-base M\n\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {

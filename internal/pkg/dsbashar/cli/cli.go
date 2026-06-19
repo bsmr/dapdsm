@@ -1,4 +1,4 @@
-// Package cli implements the dunectl command-line interface.
+// Package cli implements the ds-bashar command-line interface.
 //
 // Run dispatches an argv tail to the matching subcommand. Subcommands receive
 // a context plus injected stdin/stdout/stderr and never call os.Exit; they
@@ -12,7 +12,7 @@ import (
 	"io"
 )
 
-// ErrUsage is returned when the caller invoked dunectl with no subcommand or
+// ErrUsage is returned when the caller invoked ds-bashar with no subcommand or
 // with an unknown one. main maps it to exit code 2.
 var ErrUsage = errors.New("usage error")
 
@@ -63,10 +63,12 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return applyUserSettingsCmd(ctx, args[1:], stdout, stderr)
 	case "update":
 		return updateCmd(ctx, args[1:], stdout, stderr)
+	case "broadcast":
+		return broadcastCmd(ctx, args[1:], stdout, stderr)
 	case "version", "-v", "--version":
 		return versionCmd(ctx, args[1:], stdout, stderr)
 	default:
-		return fmt.Errorf("unknown subcommand %q (try \"dunectl help\"): %w", args[0], ErrUsage)
+		return fmt.Errorf("unknown subcommand %q (try \"ds-bashar help\"): %w", args[0], ErrUsage)
 	}
 }
 
@@ -74,10 +76,10 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, usage)
 }
 
-const usage = `dunectl — orchestrate Dune Awakening private dedicated servers.
+const usage = `ds-bashar — orchestrate Dune Awakening private dedicated servers.
 
 Usage:
-  dunectl <command> [arguments]
+  ds-bashar <command> [arguments]
 
 Commands:
   help                Print this message.
@@ -146,6 +148,8 @@ Commands:
                       the apply. This is the post-update hook that
                       prevents Sietches from losing their DisplayName
                       after a 'battlegroup update'.
+  broadcast [--ssh A]  Send an in-game banner. Default: local kubectl on the
+   <text>              node; --ssh <alias> publishes over SSH. --title, --duration.
 
 Operator configuration is read from /etc/dune/dunectl.env;
 see etc/dune/dunectl.env.example for the supported keys.

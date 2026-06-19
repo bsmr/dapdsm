@@ -100,7 +100,7 @@ func Open(getenv func(string) string) (*Core, error) {
 		Audit: func() ([]store.AuditEntry, error) { return st.ListAudit(0) },
 	}
 	mgr := schedule.NewManager(
-		&broadcast.Runner{SSH: sshClient, Store: st},
+		&broadcast.Runner{Exec: sshClient, Store: st},
 		&lifecycle.Runner{SSH: sshClient, Store: st},
 		st, ssePub{hub},
 	)

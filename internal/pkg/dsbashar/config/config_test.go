@@ -167,6 +167,14 @@ func TestLoadFromFile(t *testing.T) {
 	}
 }
 
+func TestDefaultPathIsDunectlEnv(t *testing.T) {
+	// Spec invariant: the config file name stays /etc/dune/dunectl.env
+	// (zero on-VM migration); only the binary was renamed to ds-bashar.
+	if DefaultPath != "/etc/dune/dunectl.env" {
+		t.Fatalf("DefaultPath = %q, want /etc/dune/dunectl.env", DefaultPath)
+	}
+}
+
 func TestLoadFromFile_NotFound(t *testing.T) {
 	t.Parallel()
 	_, err := LoadFromFile(filepath.Join(t.TempDir(), "missing.env"))

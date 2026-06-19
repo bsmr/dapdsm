@@ -56,7 +56,7 @@ func runHealStuckPods(ctx context.Context, args []string, stdout, stderr io.Writ
 	thresholdMin := fs.Int("threshold-minutes", 10, "Game-server pod age above which not-Ready counts as stuck")
 	apply := fs.Bool("apply", false, "Actually delete the flagged pods (default: dry-run report)")
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: dunectl heal-stuck-pods [--apply] [--threshold-minutes N]\n\n")
+		fmt.Fprintf(stderr, "Usage: ds-bashar heal-stuck-pods [--apply] [--threshold-minutes N]\n\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(reorderFlagArgs(fs, args)); err != nil {

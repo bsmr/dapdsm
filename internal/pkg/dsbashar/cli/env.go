@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunectl/config"
+	"go.muehmer.eu/dapdsm/internal/pkg/dsbashar/config"
 )
 
 func envCmd(_ context.Context, args []string, stdout, stderr io.Writer) error {

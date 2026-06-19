@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunectl/config"
+	"go.muehmer.eu/dapdsm/internal/pkg/dsbashar/config"
 )
 
 // setupRunFunc is the indirection that lets tests inject a fake exec.
@@ -66,12 +66,12 @@ func defaultSetupRun(stdout, stderr io.Writer) setupRunFunc {
 //
 // Idempotency is provided by Funcom's setup.sh itself: re-running on an
 // already-bootstrapped BG is not safe (it tries to recreate the
-// namespace). dunectl setup is meant for fresh BattleGroups only.
+// namespace). ds-bashar setup is meant for fresh BattleGroups only.
 func runSetup(ctx context.Context, args []string, stdout, stderr io.Writer, deps setupDeps) error {
 	fs := flag.NewFlagSet("setup", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: dunectl setup\n\n"+
+		fmt.Fprintf(stderr, "Usage: ds-bashar setup\n\n"+
 			"Reads WORLD_NAME and WORLD_REGION from /etc/dune/dunectl.env,\n"+
 			"reads the FLS token from FLS_TOKEN_FILE, and pipes them to\n"+
 			"Funcom's setup.sh in non-interactive mode.\n\n")

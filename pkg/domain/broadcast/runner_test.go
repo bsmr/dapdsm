@@ -99,7 +99,7 @@ func defaultFakeRunner(publishOut string) *recordingRunner {
 
 func TestPublishNoticeRoundtrip(t *testing.T) {
 	rr := defaultFakeRunner("publish=ok exchange=heartbeats routing=notifications app_id=fls_backend user_id=fls label=notice\n")
-	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	r := &Runner{Exec: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 
 	got, err := r.PublishNotice(context.Background(), "operator", "vm-a", "Title", "Body", 30)
 	if err != nil {
@@ -135,7 +135,7 @@ func TestPublishNoticeRoundtrip(t *testing.T) {
 
 func TestPublishShutdownAnnounce(t *testing.T) {
 	rr := defaultFakeRunner("publish=ok")
-	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	r := &Runner{Exec: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 	if _, err := r.PublishShutdownAnnounce(context.Background(), "operator", "vm-a", ShutdownAnnounce{Kind: "Restart", AtUnix: 1, NowUnix: 0, ShutdownDurationS: 1, BroadcastFrequency: 1, BroadcastDuration: 1}); err != nil {
 		t.Fatalf("PublishShutdownAnnounce: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestPublishShutdownAnnounce(t *testing.T) {
 
 func TestPublishMissingPublishOkIsError(t *testing.T) {
 	rr := defaultFakeRunner("publish=not_ok")
-	r := &Runner{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	r := &Runner{Exec: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 	res, _ := r.PublishNotice(context.Background(), "operator", "vm-a", "T", "B", 1)
 	if res != nil && res.OK {
 		t.Errorf("OK=true for not_ok output, want false")
@@ -164,7 +164,7 @@ func TestPublishNoticeWithFileToken(t *testing.T) {
 		publishStdout:   "publish=ok",
 	}
 	r := &Runner{
-		SSH:       &ssh.Client{Runner: rr},
+		Exec:      &ssh.Client{Runner: rr},
 		Store:     newTempStore(t),
 		TokenPath: mq.DefaultTokenPath,
 	}

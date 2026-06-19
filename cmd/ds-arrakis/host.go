@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunectl/config"
+	"go.muehmer.eu/dapdsm/internal/pkg/dsbashar/config"
 	"go.muehmer.eu/dapdsm/pkg/domain/bootstrap"
 	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 	"go.muehmer.eu/dapdsm/pkg/transport/kubedist"

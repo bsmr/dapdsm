@@ -1,8 +1,8 @@
-// Package config loads dunectl operator configuration from
+// Package config loads ds-bashar operator configuration from
 // /etc/dune/dunectl.env, a sourceable POSIX shell KEY=VALUE file.
 //
 // The same file is consumed by Bash helpers (via `. /etc/dune/dunectl.env`)
-// and by dunectl (via Parse). Both sides must read identical semantics, so
+// and by ds-bashar (via Parse). Both sides must read identical semantics, so
 // the parser implements only what POSIX shell sourcing would also accept:
 // blank lines, # comments, KEY=VALUE with optional matched outer quotes,
 // no escape sequences.
@@ -18,7 +18,7 @@ import (
 	"strings"
 )
 
-// DefaultPath is the on-disk location of the dunectl operator config.
+// DefaultPath is the on-disk location of the ds-bashar operator config.
 const DefaultPath = "/etc/dune/dunectl.env"
 
 // Steam app IDs for the two supported targets.
@@ -45,14 +45,14 @@ type Config struct {
 	// underscore/hyphen) — the generated CR sets it as a bare scalar.
 	WorldName string
 	// WorldRegion is the human region name ("Europe", "North America", …).
-	// dunectl maps it to the 1-based index Funcom's setup.sh expects.
+	// ds-bashar maps it to the 1-based index Funcom's setup.sh expects.
 	WorldRegion string
 	// HostDatacenterID is the short identifier patched into the
 	// HOST_DATACENTER_ID env-var on the Director / Server-Gateway /
 	// Text-Router pods. Empty (the default) leaves the Funcom vendor
 	// default "dune-testing" in place.
 	HostDatacenterID string
-	// Reconcile knobs: read by `dunectl reconcile` to drive the
+	// Reconcile knobs: read by `ds-bashar reconcile` to drive the
 	// post-bootstrap pipeline declaratively without a shell script.
 	AlwaysOnSets       []string // ALWAYS_ON_SETS — space-separated map names
 	ServerDisplayName  string   // SERVER_DISPLAY_NAME
@@ -93,7 +93,7 @@ func ValidWorldName(name string) bool {
 // Parse reads a dunectl.env stream and returns the resulting Config.
 //
 // Unknown keys are ignored so newer shell-side settings do not break older
-// dunectl binaries.
+// ds-bashar binaries.
 func Parse(r io.Reader) (Config, error) {
 	var c Config
 	scanner := bufio.NewScanner(r)
@@ -182,7 +182,7 @@ func (c Config) AppID() uint32 {
 	return 0
 }
 
-// LoadFromFile reads and parses the dunectl env-file at path.
+// LoadFromFile reads and parses the ds-bashar env-file at path.
 func LoadFromFile(path string) (Config, error) {
 	f, err := os.Open(path)
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunectl/config"
+	"go.muehmer.eu/dapdsm/internal/pkg/dsbashar/config"
 )
 
 // reconcileDeps groups the per-step actions reconcile orchestrates. The
@@ -60,7 +60,7 @@ func runReconcile(ctx context.Context, args []string, stdout, stderr io.Writer, 
 	fs := flag.NewFlagSet("reconcile", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: dunectl reconcile\n\n"+
+		fmt.Fprint(stderr, "Usage: ds-bashar reconcile\n\n"+
 			"Drives the full post-bootstrap pipeline (init-db, patch-battlegroup,\n"+
 			"patch-game-ports, enable-set, ini-set ServerDisplayName / Password)\n"+
 			"from /etc/dune/dunectl.env. Replaces the legacy post-bootstrap.sh.\n")

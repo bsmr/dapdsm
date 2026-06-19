@@ -95,7 +95,7 @@ func mustGranter(t *testing.T, offline bool) (*Granter, *recorder) {
 	rec := &recorder{offline: offline, publishStdout: "publish=ok\n"}
 	st := newTempStore(t)
 	db := &gamedb.Runner{SSH: &ssh.Client{Runner: rec}, Store: st}
-	pub := &mq.Publisher{SSH: &ssh.Client{Runner: rec}, Store: st}
+	pub := &mq.Publisher{Exec: &ssh.Client{Runner: rec}, Store: st}
 	return &Granter{DB: db, MQ: pub, Store: st}, rec
 }
 

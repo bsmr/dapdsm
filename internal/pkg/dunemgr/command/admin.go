@@ -53,7 +53,7 @@ func adminCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr i
 		}
 	}
 
-	r := &admin.Runner{MQ: &mq.Publisher{SSH: c.SSH, Store: c.Store}}
+	r := &admin.Runner{MQ: &mq.Publisher{Exec: c.SSH, Store: c.Store}}
 	res, err := r.Run(ctx, "cli", host, verb, playerID, fields, confirm)
 	if err != nil {
 		return err

@@ -214,7 +214,7 @@ func TestPublishInnerRoundtrip(t *testing.T) {
 		bgdEnvStdout:    "fake-service-token",
 		publishStdout:   "publish=ok exchange=heartbeats routing=notifications app_id=fls_backend user_id=fls label=notice\n",
 	}
-	pub := &Publisher{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	pub := &Publisher{Exec: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 
 	res, err := pub.PublishInner(context.Background(), "operator", "vm-a",
 		"broadcast.notice", "host=vm-a title=\"Title\"",
@@ -270,7 +270,7 @@ func TestPublishInner_NoGamePod(t *testing.T) {
 		bgdEnvStdout:    "fake-service-token",
 		publishStdout:   "",
 	}
-	pub := &Publisher{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	pub := &Publisher{Exec: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 	_, err := pub.PublishInner(context.Background(), "operator", "vm-a",
 		"broadcast.notice", "host=vm-a", `{}`, "notice")
 	if err == nil {
@@ -291,7 +291,7 @@ func TestPublishInnerMissingPublishOk(t *testing.T) {
 		bgdEnvStdout:    "fake-service-token",
 		publishStdout:   "publish=not_ok",
 	}
-	pub := &Publisher{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	pub := &Publisher{Exec: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 	res, _ := pub.PublishInner(context.Background(), "operator", "vm-a",
 		"broadcast.notice", "host=vm-a", `{}`, "notice")
 	if res != nil && res.OK {
@@ -309,7 +309,7 @@ func TestPublishInner_DiscoveredNamespaceNotDune(t *testing.T) {
 		bgdEnvStdout:    "fake-token",
 		publishStdout:   "publish=ok",
 	}
-	pub := &Publisher{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	pub := &Publisher{Exec: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 	if _, err := pub.PublishInner(context.Background(), "op", "vm-a",
 		"test.action", "subj", `{}`, "lbl"); err != nil {
 		t.Fatalf("PublishInner: %v", err)
@@ -486,7 +486,7 @@ func TestDefaultTokenChain(t *testing.T) {
 		bgdEnvStdout:    "fake-chain-default-token",
 		publishStdout:   "publish=ok",
 	}
-	pub := &Publisher{SSH: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
+	pub := &Publisher{Exec: &ssh.Client{Runner: rr}, Store: newTempStore(t)}
 	_, err := pub.PublishInner(context.Background(), "operator", "vm-a",
 		"broadcast.notice", "host=vm-a", `{}`, "notice")
 	if err != nil {
@@ -514,7 +514,7 @@ func TestFileToken_ExplicitPath(t *testing.T) {
 		publishStdout:   "publish=ok",
 	}
 	pub := &Publisher{
-		SSH:   &ssh.Client{Runner: rr},
+		Exec:  &ssh.Client{Runner: rr},
 		Store: newTempStore(t),
 		Token: FileToken{Path: DefaultTokenPath},
 	}
@@ -538,7 +538,7 @@ func TestFileToken_EmptyToken(t *testing.T) {
 		publishStdout:   "",
 	}
 	pub := &Publisher{
-		SSH:   &ssh.Client{Runner: rr},
+		Exec:  &ssh.Client{Runner: rr},
 		Store: newTempStore(t),
 		Token: FileToken{Path: DefaultTokenPath},
 	}

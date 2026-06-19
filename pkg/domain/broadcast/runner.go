@@ -6,7 +6,6 @@ import (
 
 	"go.muehmer.eu/dapdsm/pkg/domain/mq"
 	"go.muehmer.eu/dapdsm/pkg/domain/store"
-	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 // Defaults for the MQ pod lookup. These re-export the values from the
@@ -23,7 +22,7 @@ const (
 //  2. SSH `kubectl get pods -n <Namespace> -l <Selector> -o ...` to find the MQ pod
 //  3. SSH `kubectl exec -i -n <Namespace> <mq-pod> -- sh -lc <shell>` piping Erlang
 type Runner struct {
-	SSH   *ssh.Client
+	Exec  mq.HostExecer
 	Store *store.Store
 	// Optional overrides. Zero values map to the Default* constants.
 	Namespace     string
@@ -71,7 +70,7 @@ func (r *Runner) publisher() *mq.Publisher {
 		ts = mq.FileToken{Path: r.TokenPath}
 	}
 	return &mq.Publisher{
-		SSH:           r.SSH,
+		Exec:          r.Exec,
 		Store:         r.Store,
 		Namespace:     r.Namespace,
 		MQPodSelector: r.MQPodSelector,

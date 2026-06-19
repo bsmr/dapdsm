@@ -30,11 +30,12 @@ func execVendor(ctx context.Context, bin, action string, stdout, stderr io.Write
 }
 
 type lifecycleDeps struct {
-	runVendor vendorRunner
+	runVendor    vendorRunner
+	announceDeps announceDeps
 }
 
 func defaultLifecycleDeps() lifecycleDeps {
-	return lifecycleDeps{runVendor: execVendor}
+	return lifecycleDeps{runVendor: execVendor, announceDeps: defaultAnnounceDeps()}
 }
 
 func startCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -53,6 +54,7 @@ func runLifecycle(ctx context.Context, action string, args []string, stdout, std
 	fs := flag.NewFlagSet(action, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	bin := fs.String("bg-binary", DefaultBattlegroupBin, "Path to Funcom's battlegroup wrapper")
+	announce := fs.Duration("announce", 0, "Announce a shutdown countdown of this duration, then act (e.g. 5m)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -63,5 +65,12 @@ func runLifecycle(ctx context.Context, action string, args []string, stdout, std
 		fmt.Fprintf(stderr, "%s: unexpected positional argument(s): %v\n", action, fs.Args())
 		return ErrUsage
 	}
-	return deps.runVendor(ctx, *bin, action, stdout, stderr)
+	kind := map[string]string{"restart": "Restart", "stop": "Maintenance"}[action]
+	if *announce > 0 && kind == "" {
+		fmt.Fprintf(stderr, "%s: --announce is not supported for %s\n", action, action)
+		return ErrUsage
+	}
+	return withAnnounce(ctx, *announce, kind, func(ctx context.Context) error {
+		return deps.runVendor(ctx, *bin, action, stdout, stderr)
+	}, deps.announceDeps)
 }

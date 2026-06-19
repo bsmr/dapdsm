@@ -34,7 +34,7 @@ func TestShutdownUnknownSub(t *testing.T) {
 	c := &core.Core{
 		Store: st, SSH: ssh.NewClient(),
 		Schedule: schedule.NewManager(
-			&broadcast.Runner{SSH: nil, Store: st},
+			&broadcast.Runner{Exec: nil, Store: st},
 			&lifecycle.Runner{SSH: nil, Store: st},
 			st, nil),
 	}
@@ -53,7 +53,7 @@ func TestShutdownStatusNoRecord(t *testing.T) {
 	c := &core.Core{
 		Store: st, SSH: ssh.NewClient(),
 		Schedule: schedule.NewManager(
-			&broadcast.Runner{SSH: nil, Store: st},
+			&broadcast.Runner{Exec: nil, Store: st},
 			&lifecycle.Runner{SSH: nil, Store: st},
 			st, nil),
 	}
@@ -81,7 +81,7 @@ func TestShutdownStatusWithRecord(t *testing.T) {
 	c := &core.Core{
 		Store: st, SSH: ssh.NewClient(),
 		Schedule: schedule.NewManager(
-			&broadcast.Runner{SSH: nil, Store: st},
+			&broadcast.Runner{Exec: nil, Store: st},
 			&lifecycle.Runner{SSH: nil, Store: st},
 			st, nil),
 	}

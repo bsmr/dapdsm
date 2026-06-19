@@ -118,7 +118,7 @@ func TestIniSet_CustomFileAndSection(t *testing.T) {
 
 func TestIniSet_AcceptsFlagsAfterPositionals(t *testing.T) {
 	t.Parallel()
-	// User-pattern from 2026-05-25: `dunectl ini-set KEY VALUE --apply --restart`.
+	// User-pattern from 2026-05-25: `ds-bashar ini-set KEY VALUE --apply --restart`.
 	// Go's flag package stops at the first non-flag, so without the
 	// pre-reorder this used to fail with "need exactly two positional args".
 	_, _, deps := newIniDeps(iniBefore)

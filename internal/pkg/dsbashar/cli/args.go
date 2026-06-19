@@ -15,7 +15,7 @@ type boolFlag interface {
 // reorderFlagArgs returns args with all recognised flags (and their
 // value-args when applicable) moved before the positional arguments,
 // so Go's flag.Parse — which stops at the first non-flag — accepts
-// intermixed CLI calls like `dunectl ini-set KEY VALUE --apply`.
+// intermixed CLI calls like `ds-bashar ini-set KEY VALUE --apply`.
 //
 // Strategy: scan args once, classify each as flag-or-value by looking
 // it up in fs. A flag carries a separate value-arg when (a) it is not
