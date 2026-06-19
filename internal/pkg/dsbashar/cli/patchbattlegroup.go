@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunectl/config"
+	"go.muehmer.eu/dapdsm/internal/pkg/dsbashar/config"
 	"go.muehmer.eu/dapdsm/pkg/domain/battlegroup"
 	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 	"go.muehmer.eu/dapdsm/pkg/transport/publicip"

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Deploy dunectl (and dapdsm-side config templates) to a target VM.
+# Deploy ds-bashar (and dapdsm-side config templates) to a target VM.
 #
 # Standalone: runs from a fresh `dapdsm` clone, without the meta-repo.
-#   - cross-build dunectl for linux/amd64 with VCS metadata baked in
+#   - cross-build ds-bashar for linux/amd64 with VCS metadata baked in
 #   - rsync this repo's etc/ to /opt/dapdsm on the host
-#   - install the binary at /usr/local/bin/dunectl
+#   - install the binary at /usr/local/bin/ds-bashar
 #
 # Idempotent. Run from the operator workstation, with SSH access to the
 # target VM as the dune user (see "Access Model" in CLAUDE.md).
@@ -18,7 +18,7 @@
 # This script does not touch /etc/dune/, /etc/rancher/k3s/, or the
 # BattleGroup state — those are operator decisions, applied separately.
 # Host bootstrap (K3s installer, SteamCMD, Funcom operator images) is
-# orthogonal to dunectl and lives in the meta-repo orchestrator.
+# orthogonal to ds-bashar and lives in the meta-repo orchestrator.
 
 set -euo pipefail
 
@@ -29,24 +29,24 @@ fi
 
 readonly HOST="$1"
 readonly REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-readonly BIN="${REPO_ROOT}/bin/dunectl-linux-amd64"
+readonly BIN="${REPO_ROOT}/bin/ds-bashar-linux-amd64"
 
 cd "${REPO_ROOT}"
 
 echo "[1/4] go vet"
 go vet ./...
 
-echo "[2/4] cross-build dunectl for linux/amd64"
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o "${BIN}" ./cmd/dunectl
+echo "[2/4] cross-build ds-bashar for linux/amd64"
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o "${BIN}" ./cmd/ds-bashar
 
 echo "[3/4] sync etc/ to dune@${HOST}:/opt/dapdsm"
 tar -c etc | ssh -o BatchMode=yes "dune@${HOST}" \
   'sudo install -d -m 0755 /opt/dapdsm && sudo tar -x -C /opt/dapdsm && sudo chown -R root:root /opt/dapdsm'
 
-echo "[4/4] install /usr/local/bin/dunectl"
-scp -o BatchMode=yes "${BIN}" "dune@${HOST}:/tmp/dunectl"
+echo "[4/4] install /usr/local/bin/ds-bashar"
+scp -o BatchMode=yes "${BIN}" "dune@${HOST}:/tmp/ds-bashar"
 ssh -o BatchMode=yes "dune@${HOST}" \
-  'sudo install -m 0755 /tmp/dunectl /usr/local/bin/dunectl && rm -f /tmp/dunectl'
+  'sudo install -m 0755 /tmp/ds-bashar /usr/local/bin/ds-bashar && rm -f /tmp/ds-bashar'
 
 echo
-ssh -o BatchMode=yes "dune@${HOST}" 'dunectl version'
+ssh -o BatchMode=yes "dune@${HOST}" 'ds-bashar version'

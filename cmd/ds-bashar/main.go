@@ -1,6 +1,6 @@
-// Command dunectl orchestrates Dune Awakening private dedicated servers.
+// Command ds-bashar orchestrates Dune Awakening private dedicated servers.
 //
-// All application logic lives in internal/pkg/dunectl/*. This file is wiring
+// All application logic lives in internal/pkg/dsbashar/*. This file is wiring
 // only: it builds the context, signal handling, and dispatches to cli.Run.
 package main
 
@@ -12,12 +12,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"go.muehmer.eu/dapdsm/internal/pkg/dunectl/cli"
+	"go.muehmer.eu/dapdsm/internal/pkg/dsbashar/cli"
 )
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "dunectl: %s\n", err)
+		fmt.Fprintf(os.Stderr, "ds-bashar: %s\n", err)
 		if errors.Is(err, cli.ErrUsage) {
 			os.Exit(2)
 		}

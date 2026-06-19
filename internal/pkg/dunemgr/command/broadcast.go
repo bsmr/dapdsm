@@ -20,7 +20,7 @@ func broadcastCmd(ctx context.Context, c *core.Core, args []string, stdout, stde
 		return fmt.Errorf("broadcast: usage: %w", ErrUsage)
 	}
 	host, kind, rest := args[0], args[1], args[2:]
-	r := &broadcast.Runner{SSH: c.SSH, Store: c.Store}
+	r := &broadcast.Runner{Exec: c.SSH, Store: c.Store}
 	switch kind {
 	case "notice":
 		fs := flag.NewFlagSet("notice", flag.ContinueOnError)

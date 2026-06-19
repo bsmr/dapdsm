@@ -85,7 +85,7 @@ func whisperCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr
 		return fmt.Errorf("whisper: target not online (use --force): %w", ErrUsage)
 	}
 
-	pub := &mq.Publisher{SSH: c.SSH, Store: c.Store}
+	pub := &mq.Publisher{Exec: c.SSH, Store: c.Store}
 	if *as != "" {
 		p := &grant.Persona{DB: &gamedb.Runner{SSH: c.SSH, Store: c.Store}, Store: c.Store}
 		if err := p.Seed(ctx, "cli", host, *as); err != nil {

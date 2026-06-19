@@ -19,6 +19,15 @@ import (
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
+// HostExecer runs a command (optionally with piped stdin) addressed to a host.
+// *ssh.Client satisfies it (commands run over SSH); ssh.LocalExecer satisfies it
+// (commands run locally, host ignored). This is the messaging transport seam:
+// the RMQ operation is expressed as commands; HostExecer decides where they run.
+type HostExecer interface {
+	Run(ctx context.Context, host, name string, args ...string) (ssh.Result, error)
+	RunWithStdin(ctx context.Context, host string, stdin []byte, name string, args ...string) (ssh.Result, error)
+}
+
 // Defaults for the MQ pod lookup and token path. Override via Publisher
 // fields; zero values fall back to these constants.
 //
@@ -65,7 +74,7 @@ type Result struct {
 // Funcom FLS backend. Implementations may read the token from disk via
 // SSH, fetch it from an API, or return a static value for tests.
 type TokenSource interface {
-	Token(ctx context.Context, sshClient *ssh.Client, host string) (string, error)
+	Token(ctx context.Context, exec HostExecer, host string) (string, error)
 }
 
 // FileToken reads the auth token from a file on the remote host via
@@ -76,8 +85,8 @@ type FileToken struct {
 }
 
 // Token implements TokenSource by running `cat <Path>` on the remote host.
-func (f FileToken) Token(ctx context.Context, sshClient *ssh.Client, host string) (string, error) {
-	res, err := sshClient.Run(ctx, host, "cat", f.Path)
+func (f FileToken) Token(ctx context.Context, exec HostExecer, host string) (string, error) {
+	res, err := exec.Run(ctx, host, "cat", f.Path)
 	if err != nil || res.ExitCode != 0 {
 		return "", fmt.Errorf("read auth token from %s: %w", f.Path, err)
 	}
@@ -96,7 +105,7 @@ type LiteralToken struct {
 
 // Token implements TokenSource by returning the fixed Value.
 // Returns an error if Value is empty.
-func (t LiteralToken) Token(_ context.Context, _ *ssh.Client, _ string) (string, error) {
+func (t LiteralToken) Token(_ context.Context, _ HostExecer, _ string) (string, error) {
 	if t.Value == "" {
 		return "", fmt.Errorf("LiteralToken: value is empty")
 	}
@@ -140,13 +149,13 @@ func (t BGEnvToken) bgSelector() string {
 }
 
 // Token implements TokenSource by reading the env-var from the bgd-deploy pod.
-func (t BGEnvToken) Token(ctx context.Context, sshClient *ssh.Client, host string) (string, error) {
+func (t BGEnvToken) Token(ctx context.Context, exec HostExecer, host string) (string, error) {
 	ns := DefaultNamespace
 	sel := t.bgSelector()
 	envVar := t.envVar()
 
 	// 1. Find the bgd-deploy pod.
-	podRes, err := sshClient.Run(ctx, host, "kubectl", "get", "pods",
+	podRes, err := exec.Run(ctx, host, "kubectl", "get", "pods",
 		"-n", ns, "-l", sel,
 		"-o", "jsonpath={.items[0].metadata.name}")
 	if err != nil || podRes.ExitCode != 0 {
@@ -162,7 +171,7 @@ func (t BGEnvToken) Token(ctx context.Context, sshClient *ssh.Client, host strin
 		`{range .spec.containers[*].env[?(@.name=="%s")]}{.value}{end}`,
 		envVar,
 	)
-	litRes, err := sshClient.Run(ctx, host, "kubectl", "get", "pod", pod,
+	litRes, err := exec.Run(ctx, host, "kubectl", "get", "pod", pod,
 		"-n", ns, "-o", "jsonpath="+literalExpr)
 	if err == nil && litRes.ExitCode == 0 {
 		if tok := strings.TrimSpace(litRes.Stdout); tok != "" {
@@ -179,12 +188,12 @@ func (t BGEnvToken) Token(ctx context.Context, sshClient *ssh.Client, host strin
 		`{range .spec.containers[*].env[?(@.name=="%s")]}{.valueFrom.secretKeyRef.key}{end}`,
 		envVar,
 	)
-	secretNameRes, err := sshClient.Run(ctx, host, "kubectl", "get", "pod", pod,
+	secretNameRes, err := exec.Run(ctx, host, "kubectl", "get", "pod", pod,
 		"-n", ns, "-o", "jsonpath="+secretNameExpr)
 	if err != nil || secretNameRes.ExitCode != 0 {
 		return "", fmt.Errorf("BGEnvToken: read secretKeyRef.name from pod %s: %w", pod, err)
 	}
-	secretKeyRes, err := sshClient.Run(ctx, host, "kubectl", "get", "pod", pod,
+	secretKeyRes, err := exec.Run(ctx, host, "kubectl", "get", "pod", pod,
 		"-n", ns, "-o", "jsonpath="+secretKeyExpr)
 	if err != nil || secretKeyRes.ExitCode != 0 {
 		return "", fmt.Errorf("BGEnvToken: read secretKeyRef.key from pod %s: %w", pod, err)
@@ -197,7 +206,7 @@ func (t BGEnvToken) Token(ctx context.Context, sshClient *ssh.Client, host strin
 
 	// Fetch the secret and base64-decode the key value.
 	secretDataExpr := fmt.Sprintf("{.data.%s}", secretKey)
-	secRes, err := sshClient.Run(ctx, host, "kubectl", "get", "secret", secretName,
+	secRes, err := exec.Run(ctx, host, "kubectl", "get", "secret", secretName,
 		"-n", ns, "-o", "jsonpath="+secretDataExpr)
 	if err != nil || secRes.ExitCode != 0 {
 		return "", fmt.Errorf("BGEnvToken: read secret %s key %s: %w", secretName, secretKey, err)
@@ -224,10 +233,10 @@ type ChainToken struct {
 }
 
 // Token implements TokenSource by trying each source in order.
-func (t ChainToken) Token(ctx context.Context, sshClient *ssh.Client, host string) (string, error) {
+func (t ChainToken) Token(ctx context.Context, exec HostExecer, host string) (string, error) {
 	var lastErr error
 	for _, src := range t.Sources {
-		tok, err := src.Token(ctx, sshClient, host)
+		tok, err := src.Token(ctx, exec, host)
 		if err == nil && tok != "" {
 			return tok, nil
 		}
@@ -285,11 +294,19 @@ func pickGameNsPod(lines []string) (ns, pod string, ok bool) {
 // MQPodSelector, and Token fall back to the Default* constants /
 // defaultTokenChain().
 type Publisher struct {
-	SSH           *ssh.Client
+	Exec          HostExecer
 	Store         *store.Store
 	Namespace     string
 	MQPodSelector string
 	Token         TokenSource
+}
+
+// appendAudit records the entry if a Store is configured; a nil Store (e.g. a
+// CLI without a data dir) silently skips auditing.
+func (p *Publisher) appendAudit(e store.AuditEntry) {
+	if p.Store != nil {
+		_ = p.Store.AppendAudit(e)
+	}
 }
 
 // discoverGamePod resolves the (namespace, pod) of the mq-game broker,
@@ -311,7 +328,7 @@ func (p *Publisher) discoverGamePod(ctx context.Context, host string) (ns, pod s
 
 	if p.Namespace != "" {
 		// Explicit namespace override: scope to it, plain pod names.
-		podListRes, lerr := p.SSH.Run(ctx, host, "kubectl", "get", "pods",
+		podListRes, lerr := p.Exec.Run(ctx, host, "kubectl", "get", "pods",
 			"-n", p.Namespace, "-l", sel,
 			"-o", `jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}`)
 		if lerr != nil || podListRes.ExitCode != 0 {
@@ -331,7 +348,7 @@ func (p *Publisher) discoverGamePod(ctx context.Context, host string) (ns, pod s
 	}
 
 	// Auto-discover: query all namespaces, emit namespace/podname per line.
-	podListRes, lerr := p.SSH.Run(ctx, host, "kubectl", "get", "pods",
+	podListRes, lerr := p.Exec.Run(ctx, host, "kubectl", "get", "pods",
 		"-A", "-l", sel,
 		"-o", `jsonpath={range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\n"}{end}`)
 	if lerr != nil || podListRes.ExitCode != 0 {
@@ -380,10 +397,10 @@ func (p *Publisher) PublishInner(ctx context.Context, operator, host, action, su
 	}
 
 	// 1. Read AuthToken
-	token, err := ts.Token(ctx, p.SSH, host)
+	token, err := ts.Token(ctx, p.Exec, host)
 	if err != nil {
 		audit.Result = "error: " + err.Error()
-		_ = p.Store.AppendAudit(audit)
+		p.appendAudit(audit)
 		return nil, err
 	}
 
@@ -391,7 +408,7 @@ func (p *Publisher) PublishInner(ctx context.Context, operator, host, action, su
 	ns, pod, err := p.discoverGamePod(ctx, host)
 	if err != nil {
 		audit.Result = "error: " + err.Error()
-		_ = p.Store.AppendAudit(audit)
+		p.appendAudit(audit)
 		return nil, err
 	}
 
@@ -404,11 +421,11 @@ func (p *Publisher) PublishInner(ctx context.Context, operator, host, action, su
 		"expr=$(cat /tmp/dunemgr-mq-publish.erl); " +
 		"/opt/rabbitmq/sbin/rabbitmqctl eval \"$expr\"; " +
 		"rm -f /tmp/dunemgr-mq-publish.erl"
-	execRes, err := p.SSH.RunWithStdin(ctx, host, []byte(erlang),
+	execRes, err := p.Exec.RunWithStdin(ctx, host, []byte(erlang),
 		"kubectl", "exec", "-i", "-n", ns, pod, "--", "sh", "-lc", shell)
 	if err != nil {
 		audit.Result = "error: " + err.Error()
-		_ = p.Store.AppendAudit(audit)
+		p.appendAudit(audit)
 		return nil, fmt.Errorf("kubectl exec rabbitmqctl eval: %w", err)
 	}
 	combined := execRes.Stdout
@@ -421,7 +438,7 @@ func (p *Publisher) PublishInner(ctx context.Context, operator, host, action, su
 	} else {
 		audit.Result = "error: publish not confirmed: " + strings.TrimSpace(combined)
 	}
-	_ = p.Store.AppendAudit(audit)
+	p.appendAudit(audit)
 	return &Result{OK: ok, RawOutput: combined}, nil
 }
 

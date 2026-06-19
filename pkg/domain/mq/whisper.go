@@ -112,14 +112,14 @@ func (p *Publisher) PublishWhisper(ctx context.Context, operator, host, targetFL
 	if !flsRE.MatchString(targetFLS) {
 		err := fmt.Errorf("invalid target fls %q (expected hex)", targetFLS)
 		audit.Result = "error: " + err.Error()
-		_ = p.Store.AppendAudit(audit)
+		p.appendAudit(audit)
 		return nil, err
 	}
 
 	ns, pod, err := p.discoverGamePod(ctx, host)
 	if err != nil {
 		audit.Result = "error: " + err.Error()
-		_ = p.Store.AppendAudit(audit)
+		p.appendAudit(audit)
 		return nil, err
 	}
 
@@ -130,11 +130,11 @@ func (p *Publisher) PublishWhisper(ctx context.Context, operator, host, targetFL
 		"export PATH=/opt/rabbitmq/sbin:/opt/erlang/lib/erlang/bin:/bin:/usr/bin:/usr/local/bin:$PATH; " +
 		"cat > /tmp/dunemgr-whisper.erl; expr=$(cat /tmp/dunemgr-whisper.erl); " +
 		"/opt/rabbitmq/sbin/rabbitmqctl eval \"$expr\"; rm -f /tmp/dunemgr-whisper.erl"
-	execRes, err := p.SSH.RunWithStdin(ctx, host, []byte(erlang),
+	execRes, err := p.Exec.RunWithStdin(ctx, host, []byte(erlang),
 		"kubectl", "exec", "-i", "-n", ns, pod, "--", "sh", "-lc", shell)
 	if err != nil {
 		audit.Result = "error: " + err.Error()
-		_ = p.Store.AppendAudit(audit)
+		p.appendAudit(audit)
 		return nil, fmt.Errorf("kubectl exec rabbitmqctl eval (whisper): %w", err)
 	}
 	combined := execRes.Stdout
@@ -147,6 +147,6 @@ func (p *Publisher) PublishWhisper(ctx context.Context, operator, host, targetFL
 	} else {
 		audit.Result = "error: publish not confirmed: " + strings.TrimSpace(combined)
 	}
-	_ = p.Store.AppendAudit(audit)
+	p.appendAudit(audit)
 	return &Result{OK: ok, RawOutput: combined}, nil
 }

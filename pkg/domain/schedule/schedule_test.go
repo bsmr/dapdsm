@@ -49,7 +49,7 @@ func newTestManager(t *testing.T) (*Manager, *store.Store, *okRunner) {
 	rr := &okRunner{}
 	cli := &ssh.Client{Runner: rr}
 	m := NewManager(
-		&broadcast.Runner{SSH: cli, Store: s},
+		&broadcast.Runner{Exec: cli, Store: s},
 		&lifecycle.Runner{SSH: cli, Store: s},
 		s, nil,
 	)

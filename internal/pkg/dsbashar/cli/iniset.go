@@ -50,7 +50,7 @@ func iniSet(ctx context.Context, args []string, stdout, stderr io.Writer, deps i
 	restart := fs.Bool("restart", false, "After --apply, also run 'battlegroup restart' (implies --apply)")
 	bgBin := fs.String("bg-binary", DefaultBattlegroupBin, "Path to Funcom's battlegroup wrapper (for --apply/--restart)")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: dunectl ini-set [flags] <key> <value>")
+		fmt.Fprintln(stderr, "Usage: ds-bashar ini-set [flags] <key> <value>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(reorderFlagArgs(fs, args)); err != nil {

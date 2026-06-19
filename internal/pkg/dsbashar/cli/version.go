@@ -19,6 +19,6 @@ func versionCmd(_ context.Context, args []string, stdout, stderr io.Writer) erro
 		}
 		return fmt.Errorf("version: %w: %w", ErrUsage, err)
 	}
-	fmt.Fprintln(stdout, version.String("dunectl"))
+	fmt.Fprintln(stdout, version.String("ds-bashar"))
 	return nil
 }

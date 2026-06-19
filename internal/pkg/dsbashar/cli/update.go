@@ -9,11 +9,12 @@ import (
 )
 
 type updateDeps struct {
-	runVendor vendorRunner
+	runVendor    vendorRunner
+	announceDeps announceDeps
 }
 
 func defaultUpdateDeps() updateDeps {
-	return updateDeps{runVendor: execVendor}
+	return updateDeps{runVendor: execVendor, announceDeps: defaultAnnounceDeps()}
 }
 
 func updateCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -26,6 +27,7 @@ func runUpdate(ctx context.Context, args []string, stdout, stderr io.Writer, dep
 	bin := fs.String("bg-binary", DefaultBattlegroupBin, "Path to Funcom's battlegroup wrapper")
 	noRestart := fs.Bool("no-restart", false, "Skip the final 'battlegroup restart'")
 	fromDownloads := fs.Bool("from-downloads", false, "Use 'update-from-downloads' (apply the already-downloaded Steam version) instead of 'update' (download + apply)")
+	announce := fs.Duration("announce", 0, "Announce a shutdown countdown of this duration, then act (e.g. 5m)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -40,16 +42,18 @@ func runUpdate(ctx context.Context, args []string, stdout, stderr io.Writer, dep
 	if *fromDownloads {
 		updateAction = "update-from-downloads"
 	}
-	if err := deps.runVendor(ctx, *bin, updateAction, stdout, stderr); err != nil {
-		return err
-	}
-	if err := deps.runVendor(ctx, *bin, "apply-default-usersettings", stdout, stderr); err != nil {
-		return err
-	}
-	if !*noRestart {
-		if err := deps.runVendor(ctx, *bin, "restart", stdout, stderr); err != nil {
+	return withAnnounce(ctx, *announce, "Update", func(ctx context.Context) error {
+		if err := deps.runVendor(ctx, *bin, updateAction, stdout, stderr); err != nil {
 			return err
 		}
-	}
-	return nil
+		if err := deps.runVendor(ctx, *bin, "apply-default-usersettings", stdout, stderr); err != nil {
+			return err
+		}
+		if !*noRestart {
+			if err := deps.runVendor(ctx, *bin, "restart", stdout, stderr); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, deps.announceDeps)
 }

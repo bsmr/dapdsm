@@ -52,7 +52,7 @@ func runSetScaling(
 		fs.IntVar(&replicas, "replicas", defaultReplicas, "Number of always-on replicas per matched set")
 	}
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: dunectl %s [flags] <map> [<map>...]\n\n", name)
+		fmt.Fprintf(stderr, "Usage: ds-bashar %s [flags] <map> [<map>...]\n\n", name)
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(reorderFlagArgs(fs, args)); err != nil {
@@ -103,7 +103,7 @@ func runSetScaling(
 		return err
 	}
 	if len(notFound) > 0 {
-		return fmt.Errorf("%s: unknown map(s) %s — run 'dunectl list-sets' to see what's available",
+		return fmt.Errorf("%s: unknown map(s) %s — run 'ds-bashar list-sets' to see what's available",
 			name, strings.Join(notFound, ", "))
 	}
 	if len(ops) == 0 {

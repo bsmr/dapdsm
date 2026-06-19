@@ -13,8 +13,8 @@ func TestVersion_PrintsToStdout(t *testing.T) {
 	if err := versionCmd(context.Background(), nil, &stdout, &stderr); err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	if !strings.HasPrefix(stdout.String(), "dunectl ") {
-		t.Errorf("stdout = %q, want it to start with 'dunectl '", stdout.String())
+	if !strings.HasPrefix(stdout.String(), "ds-bashar ") {
+		t.Errorf("stdout = %q, want it to start with 'ds-bashar '", stdout.String())
 	}
 	if stderr.Len() != 0 {
 		t.Errorf("stderr = %q, want empty", stderr.String())

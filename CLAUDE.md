@@ -19,10 +19,11 @@ scripts.
 
 Current binaries:
 
-- **`dunectl`** — operator CLI: BattleGroup CR patches, Sietch
+- **`ds-bashar`** — operator CLI: BattleGroup CR patches, Sietch
   scaling, INI editing, lifecycle (start/stop/restart/pre-shutdown),
   reconcile loop, Funcom `setup.sh` driver, post-update hook,
-  player-IP apply, pod healing.
+  player-IP apply, pod healing, broadcast messaging (broadcast +
+  --announce).
 
 Planned:
 
@@ -56,7 +57,7 @@ reachable from the same version's branch here.
 │   └── version/          # Shared version info.
 ├── internal/
 │   └── pkg/              # Tool-bound packages that remain private:
-│       ├── dunectl/      #   dunectl/{cli,config}
+│       ├── dsbashar/     #   dsbashar/{cli,config}
 │       └── dunemgr/      #   dunemgr/{cli,core,command,tui,ui,sse,server,admin,schedule,config}
 ├── etc/                  # Operator config templates (synced to /opt/dapdsm/etc on the host, served as /etc/dune/ samples)
 │   └── dune/
@@ -73,7 +74,7 @@ pre-create empty scaffolding.
 ### Standalone vs. Composed Use
 
 `scripts/deploy.sh` is **standalone**: a fresh clone of this repo,
-without the meta-repo, is enough to build dunectl and ship it to a
+without the meta-repo, is enough to build ds-bashar and ship it to a
 target VM. The meta-repo composes this repo as a submodule and
 orchestrates host bootstrap (K3s installer, SteamCMD, Funcom operator
 images) separately — host bootstrap is *not* a concern of this
@@ -90,7 +91,7 @@ From the meta-repo root, the same commands work with `-C projects/dapdsm`:
 
 ```sh
 go test -C projects/dapdsm ./...
-go build -C projects/dapdsm -o ../../bin/dunectl ./cmd/dunectl
+go build -C projects/dapdsm -o ../../bin/ds-bashar ./cmd/ds-bashar
 ```
 
 ## Go Conventions

@@ -26,7 +26,7 @@ func initDBCmd(ctx context.Context, args []string, stdout, stderr io.Writer) err
 // runInitDB provisions the per-app Postgres role and database that the
 // Funcom database-operator's util-pod requires before it can initialise
 // the schema. The legacy dune-setup.sh did this from
-// action_patch_battlegroup; the dunectl migration dropped it, so a fresh
+// action_patch_battlegroup; the ds-bashar migration dropped it, so a fresh
 // BG hangs at "Schema not found, initializing" until this is run.
 //
 // Idempotent — re-run on an already-initialised BG simply re-aligns the
@@ -36,7 +36,7 @@ func runInitDB(ctx context.Context, args []string, stdout, stderr io.Writer, dep
 	fs.SetOutput(stderr)
 	ns := fs.String("namespace", "", "BattleGroup namespace (default: first funcom-seabass-*)")
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: dunectl init-db [flags]\n\n")
+		fmt.Fprintf(stderr, "Usage: ds-bashar init-db [flags]\n\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
