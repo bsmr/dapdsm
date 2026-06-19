@@ -24,6 +24,8 @@ Current binaries:
   reconcile loop, Funcom `setup.sh` driver, post-update hook,
   player-IP apply, pod healing, broadcast messaging (broadcast +
   --announce).
+- **`ds-thumper`** — config wizard + workstation→VM rollout (seals
+  secrets via age; supersedes deploy.sh).
 
 Planned:
 
@@ -61,7 +63,6 @@ reachable from the same version's branch here.
 │       └── dunemgr/      #   dunemgr/{cli,core,command,tui,ui,sse,server,admin,schedule,config}
 ├── etc/                  # Operator config templates (synced to /opt/dapdsm/etc on the host, served as /etc/dune/ samples)
 │   └── dune/
-├── scripts/              # Operator helpers (build, deploy)
 ├── bin/                  # Build output (gitignored)
 ├── go.mod
 ├── LICENSE
@@ -73,9 +74,10 @@ pre-create empty scaffolding.
 
 ### Standalone vs. Composed Use
 
-`scripts/deploy.sh` is **standalone**: a fresh clone of this repo,
-without the meta-repo, is enough to build ds-bashar and ship it to a
-target VM. The meta-repo composes this repo as a submodule and
+`ds-thumper rollout <host>` is **standalone**: a fresh clone of this
+repo, without the meta-repo, is enough to build ds-thumper and ship
+it to a target VM. (The `age` binary is a workstation prerequisite for
+secret sealing.) The meta-repo composes this repo as a submodule and
 orchestrates host bootstrap (K3s installer, SteamCMD, Funcom operator
 images) separately — host bootstrap is *not* a concern of this
 repo.
