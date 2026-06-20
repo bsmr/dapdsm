@@ -10,12 +10,13 @@ type Runner interface {
 	Run(ctx context.Context, name string, args ...string) (string, error)
 }
 
+// EnsureInstalled installs steamcmd on the target via the embedded, distro-aware
+// install-steamcmd.sh (Debian non-free/deb822 + Ubuntu multiverse, i386, debconf
+// preseed, /usr/games symlink). It runs the script with `sudo bash -c` (bash for
+// the script's herestrings/pipefail; sudo so it runs as root, skipping the
+// script's own re-exec). Idempotent.
 func EnsureInstalled(ctx context.Context, r Runner) error {
-	_, err := r.Run(ctx, "sh", "-c",
-		"command -v steamcmd || (sudo add-apt-repository -y multiverse && "+
-			"sudo dpkg --add-architecture i386 && sudo apt-get update && "+
-			"sudo apt-get install -y steamcmd)")
-	if err != nil {
+	if _, err := r.Run(ctx, "sudo", "bash", "-c", installScript); err != nil {
 		return fmt.Errorf("ensure steamcmd: %w", err)
 	}
 	return nil
