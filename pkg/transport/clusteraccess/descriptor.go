@@ -7,6 +7,7 @@ package clusteraccess
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -77,5 +78,11 @@ func parseInventory(data []byte) (nodes []Node, user, key string, err error) {
 		}
 	}
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Name < nodes[j].Name })
+	// guard (spec §8.6): a non-empty inventory that yields zero nodes is almost
+	// certainly the wrong file or a parse mismatch — fail loudly rather than
+	// silently returning an empty cluster (which OnNode/Nodes would then act on).
+	if len(strings.TrimSpace(string(data))) > 0 && len(nodes) == 0 {
+		return nil, "", "", fmt.Errorf("inventory parsed to zero nodes (wrong file or unexpected format?)")
+	}
 	return nodes, inv.All.Vars.User, inv.All.Vars.Key, nil
 }

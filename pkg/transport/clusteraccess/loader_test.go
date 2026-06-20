@@ -8,17 +8,32 @@ import (
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
+// stdinCall records one RunWithStdin invocation.
+type stdinCall struct {
+	host  string
+	stdin []byte
+	cmd   string
+	args  []string
+}
+
 // fakeExecer records each call as a flat [host, cmd, args...] slice and returns canned stdout/err.
+// RunWithStdin calls are recorded separately in stdinCall.
 type fakeExecer struct {
-	calls  [][]string // each entry: host, cmd, args...
-	stdout string
-	err    error
+	calls     [][]string // each entry: host, cmd, args...
+	stdout    string
+	err       error
+	stdinCall *stdinCall
 }
 
 func (f *fakeExecer) Run(_ context.Context, host, cmd string, args ...string) (ssh.Result, error) {
 	rec := append([]string{host, cmd}, args...)
 	f.calls = append(f.calls, rec)
 	return ssh.Result{Stdout: f.stdout}, f.err
+}
+
+func (f *fakeExecer) RunWithStdin(_ context.Context, host string, stdin []byte, cmd string, args ...string) (ssh.Result, error) {
+	f.stdinCall = &stdinCall{host: host, stdin: stdin, cmd: cmd, args: args}
+	return ssh.Result{}, nil
 }
 
 func TestLoad(t *testing.T) {
@@ -61,5 +76,20 @@ func TestLoad_ExecError(t *testing.T) {
 	_, err := Load(context.Background(), fe, LoadParams{JumpHost: "jump", InventoryPath: "/x/inventory.yml"})
 	if err == nil {
 		t.Fatal("want error when execer fails, got nil")
+	}
+}
+
+func TestParseInventory_ErrorsOnNonEmptyButNodeless(t *testing.T) {
+	// A YAML doc that is clearly not an inventory: no nodes parsed out of it.
+	bad := []byte("some: value\nother: thing\n")
+	if _, _, _, err := parseInventory(bad); err == nil {
+		t.Fatal("want error for a non-empty file that yields no nodes")
+	}
+}
+
+func TestParseInventory_EmptyFileIsNotAnError(t *testing.T) {
+	// An empty file is a different, benign case (no content to misread).
+	if _, _, _, err := parseInventory([]byte("")); err != nil {
+		t.Fatalf("empty file should not error: %v", err)
 	}
 }
