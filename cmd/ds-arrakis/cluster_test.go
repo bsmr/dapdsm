@@ -30,6 +30,10 @@ func (f *fakeClusterExecer) Run(_ context.Context, host, cmd string, args ...str
 	return ssh.Result{}, nil
 }
 
+func (f *fakeClusterExecer) RunWithStdin(_ context.Context, _ string, _ []byte, _ string, _ ...string) (ssh.Result, error) {
+	return ssh.Result{}, nil
+}
+
 const testInv = `
 all:
   children:

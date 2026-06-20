@@ -54,12 +54,9 @@ func TestParseInventory(t *testing.T) {
 }
 
 func TestParseInventory_Empty(t *testing.T) {
-	nodes, user, key, err := parseInventory([]byte("all: {}"))
-	if err != nil {
-		t.Fatalf("parseInventory: %v", err)
-	}
-	if len(nodes) != 0 || user != "" || key != "" {
-		t.Errorf("got nodes=%d user=%q key=%q, want empty", len(nodes), user, key)
+	// "all: {}" is non-empty YAML that yields zero nodes; the guard rejects it.
+	if _, _, _, err := parseInventory([]byte("all: {}")); err == nil {
+		t.Fatal("want error for non-empty nodeless inventory, got nil")
 	}
 }
 

@@ -2,6 +2,7 @@ package clusteraccess
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -103,5 +104,30 @@ func TestAccessOnJump(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("call = %v, want %v", got, want)
 		}
+	}
+}
+
+func TestKubectlStdin_PipesManifestWithKubeconfig(t *testing.T) {
+	f := &fakeExecer{}
+	d := &Descriptor{JumpHost: "jump", Kubeconfig: "/home/dune/kubeconfig", Distro: "rke2"}
+	a := New(f, d)
+	if _, err := a.KubectlStdin(context.Background(), []byte("apiVersion: v1\n"), "apply", "-f", "-"); err != nil {
+		t.Fatalf("KubectlStdin: %v", err)
+	}
+	if f.stdinCall == nil {
+		t.Fatal("RunWithStdin was not used")
+	}
+	c := f.stdinCall
+	if c.host != "jump" {
+		t.Errorf("host = %q, want jump", c.host)
+	}
+	if string(c.stdin) != "apiVersion: v1\n" {
+		t.Errorf("stdin = %q", c.stdin)
+	}
+	// env KUBECONFIG=... kubectl apply -f -
+	want := []string{"env", "KUBECONFIG=/home/dune/kubeconfig", "kubectl", "apply", "-f", "-"}
+	got := append([]string{c.cmd}, c.args...)
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("argv = %v, want %v", got, want)
 	}
 }

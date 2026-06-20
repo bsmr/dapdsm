@@ -11,6 +11,7 @@ import (
 // it; tests inject a fake. The host is always the jumphost in this package.
 type Execer interface {
 	Run(ctx context.Context, host, cmd string, args ...string) (ssh.Result, error)
+	RunWithStdin(ctx context.Context, host string, stdin []byte, cmd string, args ...string) (ssh.Result, error)
 }
 
 // LoadParams locates a cluster's descriptor files on the jumphost.

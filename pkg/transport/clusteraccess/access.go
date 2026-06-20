@@ -24,6 +24,13 @@ func (a *Access) Kubectl(ctx context.Context, args ...string) (ssh.Result, error
 	return a.ex.Run(ctx, a.d.JumpHost, "env", full...)
 }
 
+// KubectlStdin runs `kubectl <args...>` on the jumphost like Kubectl, but pipes
+// stdin to the remote process — used for `apply -f -` with a rendered manifest.
+func (a *Access) KubectlStdin(ctx context.Context, stdin []byte, args ...string) (ssh.Result, error) {
+	full := append([]string{"KUBECONFIG=" + a.d.Kubeconfig, "kubectl"}, args...)
+	return a.ex.RunWithStdin(ctx, a.d.JumpHost, stdin, "env", full...)
+}
+
 // Nodes returns the descriptor's nodes filtered by role; role == "" returns all.
 func (a *Access) Nodes(role Role) []Node {
 	if role == "" {
