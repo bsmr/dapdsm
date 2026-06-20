@@ -18,7 +18,7 @@ var ErrUsage = errors.New("usage")
 func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: ds-arrakis <subcommand> [flags]")
-		fmt.Fprintln(stderr, "subcommands: host, deploy")
+		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster")
 		return ErrUsage
 	}
 	switch args[0] {
@@ -30,10 +30,12 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 			return ErrUsage
 		}
 		return deploy(ctx, ssh.NewClient(), goBuilder{}, args[1], args[2:], stdout)
+	case "cluster":
+		return clusterCmd(ctx, ssh.NewClient(), args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "ds-arrakis: unknown subcommand %q\n", args[0])
 		fmt.Fprintln(stderr, "usage: ds-arrakis <subcommand> [flags]")
-		fmt.Fprintln(stderr, "subcommands: host, deploy")
+		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster")
 		return ErrUsage
 	}
 }
