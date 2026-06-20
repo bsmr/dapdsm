@@ -18,7 +18,7 @@ var ErrUsage = errors.New("usage")
 func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: ds-arrakis <subcommand> [flags]")
-		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster, doctor, prepare-host, depot, images")
+		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster, doctor, prepare-host, depot, images, operators")
 		return ErrUsage
 	}
 	switch args[0] {
@@ -40,10 +40,12 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 		return depotCmd(ctx, realDepotRunner, args[1:], stdout, stderr)
 	case "images":
 		return imagesCmd(ctx, ssh.NewClient(), realImagesRunner, args[1:], stdout, stderr)
+	case "operators":
+		return operatorsCmd(ctx, ssh.NewClient(), args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "ds-arrakis: unknown subcommand %q\n", args[0])
 		fmt.Fprintln(stderr, "usage: ds-arrakis <subcommand> [flags]")
-		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster, doctor, prepare-host, depot, images")
+		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster, doctor, prepare-host, depot, images, operators")
 		return ErrUsage
 	}
 }

@@ -1,0 +1,366 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: battlegroupoperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: databaseoperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: serveroperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: utilitiesoperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: battlegroup-controller-manager
+  name: battlegroupoperator-controller-manager
+  namespace: funcom-operators
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: battlegroup-controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: battlegroup-controller-manager
+    spec:
+      serviceAccountName: battlegroupoperator-controller-manager
+      containers:
+      - name: manager
+        command: ["/app/operator"]
+        args:
+        - --leader-elect
+        - --database-default-port=15432
+        - --filebrowser-default-port=18888
+        - --pghero-default-port=21111
+        - --zap-devel=false
+        - --zap-log-level=debug
+        - --zap-time-encoding=iso8601
+        - --bg-max-concurrent=2
+        - --dr-max-concurrent=2
+        - --sr-max-concurrent=2
+        - --cfo-taints-ignore=node.kubernetes.io/unschedulable,node.funcom.com/new
+        image: {{ .Registry }}/funcom/self-hosting/igw-k8s-battlegroup-operator:{{ .Version }}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      volumes:
+      - name: cert
+        secret:
+          secretName: battlegroupoperator-webhook-server-cert
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: database-controller-manager
+  name: databaseoperator-controller-manager
+  namespace: funcom-operators
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: database-controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: database-controller-manager
+    spec:
+      serviceAccountName: databaseoperator-controller-manager
+      containers:
+      - name: manager
+        command: ["/app/operator"]
+        args:
+        - --leader-elect
+        - --zap-devel=false
+        - --zap-log-level=debug
+        - --zap-time-encoding=iso8601
+        - --db-max-concurrent=1
+        - --dbdepl-max-concurrent=1
+        - --dbutil-max-concurrent=1
+        - --dbop-max-concurrent=1
+        - --dbb-max-concurrent=1
+        - --dbbs-max-concurrent=1
+        - --dbr-max-concurrent=1
+        - --dbm-max-concurrent=1
+        - --dbutil-supports-prometheus=false
+        image: {{ .Registry }}/funcom/self-hosting/igw-k8s-database-operator:{{ .Version }}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      volumes:
+      - name: cert
+        secret:
+          secretName: databaseoperator-webhook-server-cert
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: server-controller-manager
+  name: serveroperator-controller-manager
+  namespace: funcom-operators
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: server-controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: server-controller-manager
+    spec:
+      serviceAccountName: serveroperator-controller-manager
+      containers:
+      - name: manager
+        command: ["/app/operator"]
+        args:
+        - --leader-elect
+        - --zap-devel=false
+        - --zap-log-level=debug
+        - --zap-time-encoding=iso8601
+        - --sg-max-concurrent=2
+        - --ss-max-concurrent=2
+        image: {{ .Registry }}/funcom/self-hosting/igw-k8s-server-operator:{{ .Version }}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      volumes:
+      - name: cert
+        secret:
+          secretName: serveroperator-webhook-server-cert
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: utilities-controller-manager
+  name: utilitiesoperator-controller-manager
+  namespace: funcom-operators
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: utilities-controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: utilities-controller-manager
+    spec:
+      serviceAccountName: utilitiesoperator-controller-manager
+      containers:
+      - name: manager
+        command: ["/app/operator"]
+        args:
+        - --leader-elect
+        - --zap-devel=false
+        - --zap-log-level=debug
+        - --zap-time-encoding=iso8601
+        - --sgw-max-concurrent=2
+        - --bgd-max-concurrent=2
+        - --fb-max-concurrent=1
+        - --mq-max-concurrent=2
+        - --tr-max-concurrent=2
+        image: {{ .Registry }}/funcom/self-hosting/igw-k8s-utilities-operator:{{ .Version }}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      volumes:
+      - name: cert
+        secret:
+          secretName: utilitiesoperator-webhook-server-cert
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: battlegroupoperator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: battlegroupoperator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: battlegroupoperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: battlegroupoperator-leader-election-role
+  namespace: funcom-operators
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: battlegroupoperator-leader-election-rolebinding
+  namespace: funcom-operators
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: battlegroupoperator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: battlegroupoperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: databaseoperator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: databaseoperator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: databaseoperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: databaseoperator-leader-election-role
+  namespace: funcom-operators
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: databaseoperator-leader-election-rolebinding
+  namespace: funcom-operators
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: databaseoperator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: databaseoperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: serveroperator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: serveroperator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: serveroperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: serveroperator-leader-election-role
+  namespace: funcom-operators
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: serveroperator-leader-election-rolebinding
+  namespace: funcom-operators
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: serveroperator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: serveroperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: utilitiesoperator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: utilitiesoperator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: utilitiesoperator-controller-manager
+  namespace: funcom-operators
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: utilitiesoperator-leader-election-role
+  namespace: funcom-operators
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: utilitiesoperator-leader-election-rolebinding
+  namespace: funcom-operators
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: utilitiesoperator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: utilitiesoperator-controller-manager
+  namespace: funcom-operators

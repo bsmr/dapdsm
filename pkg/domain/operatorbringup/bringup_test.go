@@ -1,0 +1,160 @@
+package operatorbringup
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+)
+
+// fakeKubectl records Run argv and Apply manifests; get-secret returns notFound
+// so the webhook-secret guard takes the apply path.
+//
+// calls is a unified, ordered log of every interaction:
+//   - Run appends "run:<joined args>" (space-joined argv).
+//   - Apply appends "apply-stdin:<first line of manifest>" so ordering
+//     assertions can distinguish the operator manifest from webhook secrets.
+type fakeKubectl struct {
+	runs    [][]string
+	applied []string
+	calls   []string // unified ordered log: "run:<args>" | "apply-stdin:<first-line>"
+}
+
+func (f *fakeKubectl) Run(_ context.Context, args ...string) (string, error) {
+	f.runs = append(f.runs, args)
+	f.calls = append(f.calls, "run:"+strings.Join(args, " "))
+	// Simulate a fresh cluster: any "get <resource> ..." call returns notFound so
+	// that existence guards (cert-manager deployment, webhook secrets) all take
+	// their apply path.
+	if len(args) >= 1 && args[0] == "get" {
+		return "", errors.New("not found")
+	}
+	return "", nil
+}
+func (f *fakeKubectl) Apply(_ context.Context, manifest []byte) (string, error) {
+	f.applied = append(f.applied, string(manifest))
+	// Build a synthetic log tag that uniquely identifies the manifest:
+	// use the first substring from a priority list that appears in the content.
+	// This lets ordering assertions distinguish the operator manifest from
+	// webhook secrets or namespace manifests without embedding full content.
+	tag := "unknown"
+	s := string(manifest)
+	switch {
+	case strings.Contains(s, "battlegroupoperator-controller-manager"):
+		tag = "operator-deployments"
+	case strings.Contains(s, "kubernetes.io/tls"):
+		tag = "webhook-secret"
+	case strings.Contains(s, "kind: Namespace"):
+		tag = "namespace"
+	}
+	f.calls = append(f.calls, "apply-stdin:"+tag)
+	return "", nil
+}
+
+func runIndex(runs [][]string, sub string) int {
+	for i, r := range runs {
+		if strings.Contains(strings.Join(r, " "), sub) {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestBringUp_OrdersAndCovers(t *testing.T) {
+	f := &fakeKubectl{}
+	opts := Options{
+		Registry: "10.0.0.9:5000", Version: "v1.5.0",
+		CRDDir:         "/home/dune/depot/prod/images/operators/crds",
+		CertManagerURL: "https://example/cert-manager.yaml",
+		Workers:        []string{"worker-1", "worker-2", "worker-3"},
+	}
+	if err := BringUp(context.Background(), f, opts); err != nil {
+		t.Fatalf("BringUp: %v", err)
+	}
+	joinedRuns := func() string {
+		var b strings.Builder
+		for _, r := range f.runs {
+			b.WriteString(strings.Join(r, " ") + "\n")
+		}
+		return b.String()
+	}()
+	// cert-manager applied (url non-empty): the URL appears in a Run("apply",...,url) call.
+	if !strings.Contains(joinedRuns, "cert-manager.yaml") {
+		t.Error("cert-manager url not applied")
+	}
+	// all 3 workers labeled
+	for _, w := range opts.Workers {
+		if !strings.Contains(joinedRuns, "label node "+w+" node.funcom.com/workload=infrastructure --overwrite") {
+			t.Errorf("worker %s not labeled", w)
+		}
+	}
+	// CRDs applied server-side from the jumphost dir
+	if !strings.Contains(joinedRuns, "apply --server-side --validate=false -f "+opts.CRDDir) {
+		t.Errorf("CRDs not applied server-side:\n%s", joinedRuns)
+	}
+	// 4 webhook secrets + the operator manifest applied via Apply (stdin)
+	secretCount := 0
+	operatorManifestApplied := false
+	for _, m := range f.applied {
+		if strings.Contains(m, "kubernetes.io/tls") {
+			secretCount++
+		}
+		if strings.Contains(m, "battlegroupoperator-controller-manager") {
+			operatorManifestApplied = true
+		}
+	}
+	if secretCount != 4 {
+		t.Errorf("want 4 webhook secrets applied, got %d", secretCount)
+	}
+	if !operatorManifestApplied {
+		t.Error("operator manifest not applied")
+	}
+	// CRDs must be applied before the operator deployments are waited on.
+	// Use the namespace-scoped wait to avoid matching the cert-manager wait.
+	crdIdx := runIndex(f.runs, "apply --server-side --validate=false -f "+opts.CRDDir)
+	waitIdx := runIndex(f.runs, "wait --for=condition=Available -n "+namespace)
+	if crdIdx == -1 || waitIdx == -1 || crdIdx > waitIdx {
+		t.Errorf("ordering wrong: crdIdx=%d waitIdx=%d", crdIdx, waitIdx)
+	}
+	// Cross-check via the unified call log: the CRD apply (Run) must appear
+	// before the operator-manifest apply (Apply via stdin, tagged "operator-deployments").
+	// This catches a reorder where Apply(operatorManifest) is moved before
+	// Run("apply","--server-side",...) — something the runs/applied split log cannot catch.
+	unifCRDIdx := -1
+	unifOpIdx := -1
+	for i, entry := range f.calls {
+		if unifCRDIdx == -1 && strings.Contains(entry, "apply --server-side --validate=false -f "+opts.CRDDir) {
+			unifCRDIdx = i
+		}
+		if unifOpIdx == -1 && entry == "apply-stdin:operator-deployments" {
+			unifOpIdx = i
+		}
+	}
+	if unifCRDIdx == -1 || unifOpIdx == -1 || unifCRDIdx > unifOpIdx {
+		t.Errorf("unified-log ordering wrong: CRD apply at %d, operator-manifest apply at %d (calls: %v)",
+			unifCRDIdx, unifOpIdx, f.calls)
+	}
+	// each operator waited Available
+	for _, op := range []string{"battlegroupoperator", "databaseoperator", "serveroperator", "utilitiesoperator"} {
+		if !strings.Contains(joinedRuns, "deployment/"+op+"-controller-manager") {
+			t.Errorf("op %s not waited", op)
+		}
+	}
+}
+
+func TestBringUp_SkipsCertManagerWhenURLEmpty(t *testing.T) {
+	f := &fakeKubectl{}
+	opts := Options{
+		Registry: "r:5000", Version: "v1", CRDDir: "/d/crds",
+		CertManagerURL: "", Workers: []string{"w1"},
+	}
+	if err := BringUp(context.Background(), f, opts); err != nil {
+		t.Fatalf("BringUp: %v", err)
+	}
+	for _, r := range f.runs {
+		if strings.Contains(strings.Join(r, " "), "cert-manager") {
+			t.Errorf("cert-manager touched despite empty URL: %v", r)
+		}
+	}
+}
+
