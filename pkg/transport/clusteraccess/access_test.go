@@ -87,3 +87,21 @@ func TestAccessKubectl(t *testing.T) {
 		}
 	}
 }
+
+func TestAccessOnJump(t *testing.T) {
+	fe := &fakeExecer{stdout: "ok\n"}
+	a := New(fe, &Descriptor{JumpHost: "jump"})
+	if _, err := a.OnJump(context.Background(), "getent", "passwd", "dune"); err != nil {
+		t.Fatalf("OnJump: %v", err)
+	}
+	want := []string{"jump", "getent", "passwd", "dune"}
+	got := fe.calls[0]
+	if len(got) != len(want) {
+		t.Fatalf("call = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("call = %v, want %v", got, want)
+		}
+	}
+}

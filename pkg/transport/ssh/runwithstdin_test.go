@@ -35,18 +35,18 @@ func TestRunWithStdinPipesPayload(t *testing.T) {
 	if !bytes.Equal(rr.gotStdin, payload) {
 		t.Errorf("stdin=%q, want %q", rr.gotStdin, payload)
 	}
-	// After the fix argv is: ["ssh", "-o", "BatchMode=yes", "--", "vm-a", <single remote token>]
-	// — 6 elements total, with the remote command as the last one.
+	// After the fix argv is: ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", "vm-a", <single remote token>]
+	// — 8 elements total, with the remote command as the last one.
 	if rr.gotArgs[0] != "ssh" {
 		t.Errorf("argv[0]=%q, want ssh", rr.gotArgs[0])
 	}
-	if len(rr.gotArgs) != 6 {
-		t.Fatalf("argv len=%d, want 6; argv=%v", len(rr.gotArgs), rr.gotArgs)
+	if len(rr.gotArgs) != 8 {
+		t.Fatalf("argv len=%d, want 8; argv=%v", len(rr.gotArgs), rr.gotArgs)
 	}
-	if rr.gotArgs[4] != "vm-a" {
-		t.Errorf("argv[4]=%q, want vm-a", rr.gotArgs[4])
+	if rr.gotArgs[6] != "vm-a" {
+		t.Errorf("argv[6]=%q, want vm-a", rr.gotArgs[6])
 	}
-	remoteArg := rr.gotArgs[5]
+	remoteArg := rr.gotArgs[7]
 	// Every component of the original command must appear in the single quoted remote token.
 	for _, want := range []string{"kubectl", "exec", "-i", "podname", "--", "cat"} {
 		if !contains(remoteArg, want) {
@@ -70,11 +70,11 @@ func TestRunWithStdinRemoteArgIsSingleToken(t *testing.T) {
 	c := &Client{Runner: rr}
 	_, _ = c.RunWithStdin(context.Background(), "vm-a", nil, "kubectl", "exec", "-i", "pod", "--", "sh", "-lc", "echo foo; echo bar")
 
-	// argv: ["ssh", "-o", "BatchMode=yes", "--", "vm-a", <remote>]
-	if len(rr.gotArgs) != 6 {
-		t.Fatalf("argv len=%d, want 6; argv=%v", len(rr.gotArgs), rr.gotArgs)
+	// argv: ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", "vm-a", <remote>]
+	if len(rr.gotArgs) != 8 {
+		t.Fatalf("argv len=%d, want 8; argv=%v", len(rr.gotArgs), rr.gotArgs)
 	}
-	remoteArg := rr.gotArgs[5]
+	remoteArg := rr.gotArgs[7]
 	// The multi-statement shell script must survive as one intact token.
 	if !contains(remoteArg, "echo foo; echo bar") {
 		t.Errorf("shell script not intact in remote arg: %q", remoteArg)

@@ -15,7 +15,7 @@ func TestSendFileBuildsScpArgs(t *testing.T) {
 	if f.gotName != "scp" {
 		t.Errorf("invoked %q, want scp", f.gotName)
 	}
-	want := []string{"-o", "BatchMode=yes", "--", "/tmp/local", "vm-a:/tmp/remote"}
+	want := []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", "/tmp/local", "vm-a:/tmp/remote"}
 	if len(f.gotArgs) != len(want) {
 		t.Fatalf("args = %v, want %v", f.gotArgs, want)
 	}
