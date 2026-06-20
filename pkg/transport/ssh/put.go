@@ -15,6 +15,6 @@ func (c *Client) SendFile(ctx context.Context, host, localPath, remotePath strin
 		return err
 	}
 	dst := host + ":" + remotePath
-	_, err := c.runner().Run(ctx, "scp", "-o", "BatchMode=yes", "--", localPath, dst)
+	_, err := c.runner().Run(ctx, "scp", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", localPath, dst)
 	return err
 }

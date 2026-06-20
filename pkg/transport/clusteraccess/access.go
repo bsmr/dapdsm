@@ -48,6 +48,12 @@ func (a *Access) node(name string) (Node, error) {
 	return Node{}, fmt.Errorf("node %q not in cluster %s", name, a.d.JumpHost)
 }
 
+// OnJump runs an arbitrary command on the jumphost (the control host). Used by
+// host-prep tooling that operates on the jumphost itself rather than the cluster.
+func (a *Access) OnJump(ctx context.Context, name string, args ...string) (ssh.Result, error) {
+	return a.ex.Run(ctx, a.d.JumpHost, name, args...)
+}
+
 // OnNode runs cmd on the named node through a jumphost->node ssh hop. The node
 // key is referenced as an `ssh -i` argument executed by the jumphost's ssh
 // binary — ds-arrakis never reads the key (CLAUDE.md access rule).

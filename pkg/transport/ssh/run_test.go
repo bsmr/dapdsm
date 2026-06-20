@@ -40,9 +40,9 @@ func TestRunPassesBatchModeAndHost(t *testing.T) {
 		t.Errorf("invoked %q, want ssh", f.gotName)
 	}
 	// After the fix the argv must be exactly:
-	//   ["-o", "BatchMode=yes", "--", "vm-a", "'echo' 'ok'"]
-	// — five elements, with the remote command as a single quoted token.
-	wantPrefix := []string{"-o", "BatchMode=yes", "--", "vm-a"}
+	//   ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", "vm-a", "'echo' 'ok'"]
+	// — seven elements, with the remote command as a single quoted token.
+	wantPrefix := []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", "vm-a"}
 	if len(f.gotArgs) != len(wantPrefix)+1 {
 		t.Fatalf("args = %v, want %d elements (prefix + 1 remote token)", f.gotArgs, len(wantPrefix)+1)
 	}
@@ -84,11 +84,12 @@ func TestRunRemoteArgIsSingleToken(t *testing.T) {
 	c := &Client{Runner: f}
 	_, _ = c.Run(context.Background(), "vm-a", "kubectl", "get", "nodes", "-o", "jsonpath={a} {b} {c}")
 
-	// There must be exactly 5 args to the runner: -o BatchMode=yes -- host <remote>
-	if len(f.gotArgs) != 5 {
-		t.Fatalf("args len = %d, want 5; args = %v", len(f.gotArgs), f.gotArgs)
+	// There must be exactly 7 args to the runner:
+	// -o BatchMode=yes -o StrictHostKeyChecking=accept-new -- host <remote>
+	if len(f.gotArgs) != 7 {
+		t.Fatalf("args len = %d, want 7; args = %v", len(f.gotArgs), f.gotArgs)
 	}
-	remoteArg := f.gotArgs[4]
+	remoteArg := f.gotArgs[6]
 	// The jsonpath expression must appear verbatim inside the single remote token.
 	if !contains(remoteArg, "jsonpath={a} {b} {c}") {
 		t.Errorf("jsonpath not intact in remote arg: %q", remoteArg)

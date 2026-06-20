@@ -15,7 +15,7 @@ func TestRecvFileBuildsScpArgs(t *testing.T) {
 	if rr.gotArgs[0] != "scp" {
 		t.Errorf("argv[0]=%q, want scp", rr.gotArgs[0])
 	}
-	if !contains(got, "-o BatchMode=yes -- vm-a:/funcom/dump.backup /tmp/local.backup") {
+	if !contains(got, "-o BatchMode=yes -o StrictHostKeyChecking=accept-new -- vm-a:/funcom/dump.backup /tmp/local.backup") {
 		t.Errorf("argv tail mismatch: %q", got)
 	}
 }

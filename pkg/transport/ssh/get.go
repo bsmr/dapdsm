@@ -15,6 +15,6 @@ func (c *Client) RecvFile(ctx context.Context, host, remotePath, localPath strin
 		return err
 	}
 	src := host + ":" + remotePath
-	_, err := c.runner().Run(ctx, "scp", "-o", "BatchMode=yes", "--", src, localPath)
+	_, err := c.runner().Run(ctx, "scp", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", src, localPath)
 	return err
 }

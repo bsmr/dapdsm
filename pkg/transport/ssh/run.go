@@ -40,16 +40,18 @@ func shellJoin(cmd string, args []string) string {
 	return strings.Join(parts, " ")
 }
 
-// Run executes `ssh -o BatchMode=yes -- <host> <remote>` where <remote> is
-// cmd and args shell-quoted into a single token. The host is an alias resolved
-// by the operator's ~/.ssh/config — ProxyJump, IdentityFile, certs,
-// FIDO/U2F, etc. are honored by the system ssh binary.
+// Run executes `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new --
+// <host> <remote>` where <remote> is cmd and args shell-quoted into a single
+// token. The host is an alias resolved by the operator's ~/.ssh/config —
+// ProxyJump, IdentityFile, certs, FIDO/U2F, etc. are honored by the system ssh
+// binary. accept-new records a new host's key on first connect (so an unknown
+// host does not fail under BatchMode) while still rejecting a changed key.
 func (c *Client) Run(ctx context.Context, host, cmd string, args ...string) (Result, error) {
 	if err := mustNotBeFlag("host", host); err != nil {
 		return Result{}, err
 	}
 	remote := shellJoin(cmd, args)
-	full := []string{"-o", "BatchMode=yes", "--", host, remote}
+	full := []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", host, remote}
 	return c.runner().Run(ctx, "ssh", full...)
 }
 
@@ -62,6 +64,6 @@ func (c *Client) RunWithStdin(ctx context.Context, host string, stdin []byte, cm
 		return Result{}, err
 	}
 	remote := shellJoin(cmd, args)
-	full := []string{"-o", "BatchMode=yes", "--", host, remote}
+	full := []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "--", host, remote}
 	return c.runner().RunWithStdin(ctx, stdin, "ssh", full...)
 }
