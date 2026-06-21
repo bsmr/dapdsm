@@ -53,6 +53,11 @@ func doctorCmd(ctx context.Context, newRunner func(jump, kube string) hostprep.R
 	for _, c := range hostprep.HostChecks(ctx, r, hostprep.Opts{User: "dune", Kubeconfig: *kubeconfig}) {
 		fmt.Fprintf(stdout, "  %s %s%s\n", mark(c.OK), c.Name, detail(c.Detail))
 	}
+
+	fmt.Fprintln(stdout, "== cluster scheduling ==")
+	cp := hostprep.ControlPlaneTaint(ctx, r)
+	fmt.Fprintf(stdout, "  %s %s%s\n", mark(cp.OK), cp.Name, detail(cp.Detail))
+
 	return nil
 }
 
