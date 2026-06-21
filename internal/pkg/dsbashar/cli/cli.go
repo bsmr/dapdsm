@@ -10,14 +10,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+
+	"go.muehmer.eu/dapdsm/pkg/transport/clusteraccess"
 )
 
 // ErrUsage is returned when the caller invoked ds-bashar with no subcommand or
 // with an unknown one. main maps it to exit code 2.
 var ErrUsage = errors.New("usage error")
 
-// Run dispatches args[0] to the matching subcommand.
-func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+// Run dispatches args[0] to the matching subcommand. Leading global flags
+// --jump and --kubeconfig are stripped before the verb is dispatched. ex is the
+// SSH execer used to build the jumphost kube runner when --jump is set; pass
+// ssh.NewClient() in production, a stub in tests.
+func Run(ctx context.Context, args []string, ex clusteraccess.Execer, stdin io.Reader, stdout, stderr io.Writer) error {
+	jump, kubeconfig, rest := parseGlobals(args)
+	configureRunner(ex, jump, kubeconfig)
+	args = rest
 	if len(args) == 0 {
 		printUsage(stderr)
 		return ErrUsage
@@ -65,6 +74,10 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return updateCmd(ctx, args[1:], stdout, stderr)
 	case "broadcast":
 		return broadcastCmd(ctx, args[1:], stdout, stderr)
+	case "discover":
+		return discoverCmd(ctx, args[1:], stdout, stderr)
+	case "bringup":
+		return bringupCmd(ctx, args[1:], stdin, stdout, stderr)
 	case "version", "-v", "--version":
 		return versionCmd(ctx, args[1:], stdout, stderr)
 	default:
@@ -74,6 +87,28 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 
 func printUsage(w io.Writer) {
 	fmt.Fprint(w, usage)
+}
+
+// parseGlobals consumes leading --jump/--kubeconfig (space or =) and returns
+// the remaining argv. Unknown leading tokens stop parsing (the verb begins).
+func parseGlobals(args []string) (jump, kubeconfig string, rest []string) {
+	i := 0
+	for i < len(args) {
+		a := args[i]
+		switch {
+		case a == "--jump" && i+1 < len(args):
+			jump, i = args[i+1], i+2
+		case strings.HasPrefix(a, "--jump="):
+			jump, i = strings.TrimPrefix(a, "--jump="), i+1
+		case a == "--kubeconfig" && i+1 < len(args):
+			kubeconfig, i = args[i+1], i+2
+		case strings.HasPrefix(a, "--kubeconfig="):
+			kubeconfig, i = strings.TrimPrefix(a, "--kubeconfig="), i+1
+		default:
+			return jump, kubeconfig, args[i:]
+		}
+	}
+	return jump, kubeconfig, args[i:]
 }
 
 const usage = `ds-bashar — orchestrate Dune Awakening private dedicated servers.
@@ -150,6 +185,20 @@ Commands:
                       after a 'battlegroup update'.
   broadcast [--ssh A]  Send an in-game banner. Default: local kubectl on the
    <text>              node; --ssh <alias> publishes over SSH. --title, --duration.
+  discover            List BattleGroups discovered on the cluster.
+  bringup             Orchestrate the full multi-node bring-up: resolve
+                      config (flags or wizard) → promote it to the cluster
+                      → gate on BattleGroup discovery → run Funcom's
+                      setup.sh on the jumphost (fresh clusters only) →
+                      load the BG runtime image → init-db → reconcile.
+                      Multi-node only: requires the global --jump flag.
+                      Flags: --name --display --region --fls-token
+                      --no-input.
+
+Global flags --jump <alias> and --kubeconfig <path> precede the verb
+(e.g. ds-bashar --jump jh bringup --name Arrakis …). They select the
+jumphost the cluster is reached through; without --jump verbs use the
+local on-node kubectl.
 
 Operator configuration is read from /etc/dune/dunectl.env;
 see etc/dune/dunectl.env.example for the supported keys.

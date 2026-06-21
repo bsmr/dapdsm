@@ -61,6 +61,11 @@ func (a *Access) OnJump(ctx context.Context, name string, args ...string) (ssh.R
 	return a.ex.Run(ctx, a.d.JumpHost, name, args...)
 }
 
+// OnJumpStdin runs a command on the jumphost like OnJump, piping stdin to it.
+func (a *Access) OnJumpStdin(ctx context.Context, stdin []byte, name string, args ...string) (ssh.Result, error) {
+	return a.ex.RunWithStdin(ctx, a.d.JumpHost, stdin, name, args...)
+}
+
 // OnNode runs cmd on the named node through a jumphost->node ssh hop. The node
 // key is referenced as an `ssh -i` argument executed by the jumphost's ssh
 // binary — ds-arrakis never reads the key (CLAUDE.md access rule).

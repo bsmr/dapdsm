@@ -20,6 +20,8 @@ import (
 	"path"
 	"strings"
 	"text/template"
+
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 // Options configure the image load.
@@ -143,4 +145,72 @@ func render(opts Options) ([]byte, error) {
 		return nil, fmt.Errorf("render importer manifest: %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+// Jump runs a command on the jumphost (the tar host + ephemeral file server).
+// Satisfied by *clusteraccess.Access.
+type Jump interface {
+	OnJump(ctx context.Context, name string, args ...string) (ssh.Result, error)
+}
+
+// HTTPOptions configures the HTTP-fetch import path for a large tar.
+// Use this for tars that are too large for the kubectl-exec stream (~12 MB/s cap).
+type HTTPOptions struct {
+	Options
+	TarPathOnJump string // absolute tar path on the jumphost (base name becomes the URL path)
+	ServeDir      string // directory the jumphost file server roots at
+	ServePort     int    // port the file server listens on
+	JumpAddr      string // pod-reachable host:port for the importer pods to curl
+}
+
+// LoadViaHTTP deploys the import DaemonSet, starts an ephemeral static file
+// server on the jumphost, has each importer pod curl the tar straight into
+// `ctr images import -`, then stops the server. Used for the 4.2 GB BattleGroup
+// runtime image where the kubectl-exec stream (~12 MB/s) is too slow.
+//
+// ponytail: the jumphost server is a nohup'd `python3 -m http.server` killed by
+// its captured PID — a one-shot bring-up helper, not a long-lived service.
+// Upgrade path: replace with a tiny purpose-built static server binary on the
+// jumphost when python3 is absent or when concurrent downloads are needed.
+func LoadViaHTTP(ctx context.Context, kc Kubectl, jp Jump, opts HTTPOptions) (Result, error) {
+	manifest, err := render(opts.Options)
+	if err != nil {
+		return Result{}, fmt.Errorf("render import DaemonSet manifest: %w", err)
+	}
+	if _, err := kc.Stdin(ctx, manifest, "apply", "-f", "-"); err != nil {
+		return Result{}, fmt.Errorf("apply import DaemonSet: %w", err)
+	}
+	if _, err := kc.Run(ctx, "-n", opts.Namespace, "rollout", "status",
+		"daemonset/"+dsName, "--timeout=120s"); err != nil {
+		return Result{}, fmt.Errorf("wait import DaemonSet rollout: %w", err)
+	}
+	pods, err := importerPods(ctx, kc, opts.Namespace)
+	if err != nil {
+		return Result{}, err
+	}
+
+	// Start an ephemeral HTTP file server on the jumphost; capture its PID for cleanup.
+	pidRes, err := jp.OnJump(ctx, "sh", "-c", fmt.Sprintf(
+		"cd %s && nohup python3 -m http.server %d >/dev/null 2>&1 & echo $!",
+		opts.ServeDir, opts.ServePort))
+	if err != nil {
+		return Result{}, fmt.Errorf("start file server: %w", err)
+	}
+	pid := strings.TrimSpace(pidRes.Stdout)
+	defer jp.OnJump(ctx, "kill", pid) //nolint:errcheck // best-effort teardown
+
+	tarBasename := path.Base(opts.TarPathOnJump)
+	url := fmt.Sprintf("http://%s/%s", opts.JumpAddr, tarBasename)
+	podCtr := "/host/bin/" + path.Base(opts.CtrPath)
+	curlCmd := fmt.Sprintf(
+		"curl -fsSL %s | %s -a /host/containerd.sock -n k8s.io images import -",
+		url, podCtr)
+
+	for _, pod := range pods {
+		if _, err := kc.Run(ctx, "exec", pod, "-n", opts.Namespace, "--",
+			"sh", "-c", curlCmd); err != nil {
+			return Result{}, fmt.Errorf("http import into %s: %w", pod, err)
+		}
+	}
+	return Result{Pods: pods, Tars: []string{tarBasename}}, nil
 }

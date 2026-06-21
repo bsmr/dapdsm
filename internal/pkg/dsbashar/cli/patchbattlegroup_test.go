@@ -14,6 +14,7 @@ import (
 type fakeRunner struct {
 	cr       []byte
 	nodeIP   string // value returned for Get(nodes ...); empty means "no ExternalIP"
+	nsOut    string // value returned for Get("ns", ...) list calls; empty uses hardcoded default
 	patchErr error
 
 	patchCalls []recordedPatch
@@ -25,6 +26,9 @@ type recordedPatch struct {
 
 func (f *fakeRunner) Get(_ context.Context, args ...string) ([]byte, error) {
 	if len(args) >= 1 && args[0] == "ns" {
+		if f.nsOut != "" {
+			return []byte(f.nsOut), nil
+		}
 		return []byte("funcom-seabass-sh-deadbeef\n"), nil
 	}
 	if len(args) >= 1 && args[0] == "battlegroup" {

@@ -107,6 +107,30 @@ func TestAccessOnJump(t *testing.T) {
 	}
 }
 
+func TestAccessOnJumpStdin(t *testing.T) {
+	fe := &fakeExecer{}
+	a := New(fe, &Descriptor{JumpHost: "jump"})
+	if _, err := a.OnJumpStdin(context.Background(), []byte("Arrakis\n2\ntok\n"),
+		"sudo", "-u", "dune", "bash", "/p/setup.sh"); err != nil {
+		t.Fatalf("OnJumpStdin: %v", err)
+	}
+	if fe.stdinCall == nil {
+		t.Fatal("RunWithStdin was not used")
+	}
+	c := fe.stdinCall
+	if c.host != "jump" {
+		t.Errorf("host = %q, want jump", c.host)
+	}
+	if string(c.stdin) != "Arrakis\n2\ntok\n" {
+		t.Errorf("stdin = %q", c.stdin)
+	}
+	want := []string{"sudo", "-u", "dune", "bash", "/p/setup.sh"}
+	got := append([]string{c.cmd}, c.args...)
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("argv = %v, want %v", got, want)
+	}
+}
+
 func TestKubectlStdin_PipesManifestWithKubeconfig(t *testing.T) {
 	f := &fakeExecer{}
 	d := &Descriptor{JumpHost: "jump", Kubeconfig: "/home/dune/kubeconfig", Distro: "rke2"}

@@ -23,7 +23,7 @@ type patchBgDeps struct {
 
 func defaultPatchBgDeps(stderr io.Writer) patchBgDeps {
 	return patchBgDeps{
-		runner:   &kube.CmdRunner{Stderr: stderr},
+		runner:   newKubeRunner(stderr),
 		resolver: &publicip.HTTPResolver{},
 	}
 }

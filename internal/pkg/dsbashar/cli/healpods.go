@@ -33,8 +33,7 @@ type healPodsDeps struct {
 }
 
 func defaultHealPodsDeps(stderr io.Writer) healPodsDeps {
-	r := &kube.CmdRunner{Stderr: stderr}
-	return healPodsDeps{runner: r, listPods: kubectlListPods}
+	return healPodsDeps{runner: newKubeRunner(stderr), listPods: kubectlListPods}
 }
 
 func healStuckPodsCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {

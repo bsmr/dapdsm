@@ -18,7 +18,7 @@ type patchGamePortsDeps struct {
 
 func patchGamePortsCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	return runPatchGamePorts(ctx, args, stdout, stderr, patchGamePortsDeps{
-		runner: &kube.CmdRunner{Stderr: stderr},
+		runner: newKubeRunner(stderr),
 	})
 }
 

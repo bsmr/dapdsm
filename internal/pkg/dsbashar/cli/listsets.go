@@ -20,7 +20,7 @@ type listSetsDeps struct {
 }
 
 func defaultListSetsDeps(stderr io.Writer) listSetsDeps {
-	return listSetsDeps{runner: &kube.CmdRunner{Stderr: stderr}}
+	return listSetsDeps{runner: newKubeRunner(stderr)}
 }
 
 func listSetsCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
