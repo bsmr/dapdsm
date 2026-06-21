@@ -136,7 +136,7 @@ func CreateWorld(ctx context.Context, s Seam, cfg Config, flsToken []byte) (Resu
 	}
 	ns := "funcom-seabass-" + unique
 	vals := map[string]string{
-		"WORLD_NAME":          cfg.WorldName,
+		"WORLD_NAME":          yamlQuote(cfg.WorldName), // bare `title: {WORLD_NAME}` slot → quote for spaces/colons
 		"WORLD_UNIQUE_NAME":   unique,
 		"WORLD_REGION":        cfg.WorldRegion,
 		"WORLD_IMAGE_TAG":     PlaceholderImageTag,

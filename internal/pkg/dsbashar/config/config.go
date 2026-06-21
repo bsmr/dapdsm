@@ -13,9 +13,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // DefaultPath is the on-disk location of the ds-bashar operator config.
@@ -78,16 +79,33 @@ func RegionNumber(name string) (int, error) {
 	return 0, fmt.Errorf("unknown region %q: pick one of %s", name, strings.Join(worldRegions, ", "))
 }
 
-// validWorldName matches alphanumeric + underscore + hyphen, no spaces
-// or YAML metacharacters. The Funcom setup.sh emits the value as a bare
-// YAML scalar, so anything outside this set breaks CR parsing — see the
-// "Hadesnet: Offworld" failure mode observed on 2026-05-25.
-var validWorldName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+// maxWorldNameLen is Funcom's BattleGroup-title limit (world.sh caps it ~50).
+const maxWorldNameLen = 50
 
-// ValidWorldName reports whether name is YAML-safe for use as the
-// BattleGroup title (Funcom's setup.sh emits it as a bare scalar).
+// ValidWorldName reports whether name is acceptable as the BattleGroup title.
+// The title is rendered as a YAML double-quoted, escaped scalar (see
+// worldsetup.yamlQuote) and piped to Funcom's setup prompt, so spaces, colons,
+// dots and slashes are all safe — Funcom prompts for it interactively and the
+// server browser shows such names ("Test Server", "Dune Awakening powered by
+// no-ruto.net"). The only constraints are Funcom's ~50-rune limit and no
+// control characters (a newline would break the YAML line / the stdin prompt).
+//
+// Quoting the rendered value is what makes this safe: an earlier bare-scalar
+// render broke on titles containing a colon-space (`: `), which the regexp
+// whitelist over-corrected by also banning spaces.
 func ValidWorldName(name string) bool {
-	return validWorldName.MatchString(name)
+	if name == "" || utf8.RuneCountInString(name) > maxWorldNameLen {
+		return false
+	}
+	for _, r := range name {
+		// unicode.IsControl covers C0/C1/DEL; U+2028/U+2029 are YAML 1.2 line
+		// breaks that IsControl misses and yamlQuote does not escape — reject
+		// them too so the rendered CR always applies.
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			return false
+		}
+	}
+	return true
 }
 
 // Parse reads a dunectl.env stream and returns the resulting Config.

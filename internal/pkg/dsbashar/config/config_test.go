@@ -223,8 +223,12 @@ func TestRegionNumber(t *testing.T) {
 
 func TestValidWorldName(t *testing.T) {
 	t.Parallel()
-	ok := []string{"HADESNET", "ADESTIS", "Test-World_42", "a"}
-	bad := []string{"", "Hadesnet: Offworld", "Has Space", "with/slash", "with.dot", "äöü"}
+	ok := []string{
+		"HADESNET", "ADESTIS", "Test-World_42", "a",
+		"ADESTIS RKE2 Lab", "Test Server", "Dune Awakening powered by no-ruto.net",
+		"Hadesnet: Offworld", "with/slash", "with.dot", "äöü", strings.Repeat("x", 50),
+	}
+	bad := []string{"", "with\nnewline", "tab\tchar", "\x00null", "line sep", "para sep", strings.Repeat("x", 51)}
 	for _, s := range ok {
 		if !ValidWorldName(s) {
 			t.Errorf("ValidWorldName(%q) = false, want true", s)

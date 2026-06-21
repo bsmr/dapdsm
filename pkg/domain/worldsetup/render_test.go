@@ -19,6 +19,20 @@ func TestRenderTemplate_AllTokens(t *testing.T) {
 	}
 }
 
+func TestYAMLQuote(t *testing.T) {
+	cases := map[string]string{
+		"ADESTIS RKE2 Lab":   `"ADESTIS RKE2 Lab"`,   // spaces
+		"Hadesnet: Offworld": `"Hadesnet: Offworld"`, // colon-space (the bare-scalar breaker)
+		"no-ruto.net":        `"no-ruto.net"`,        // dot + hyphen
+		`a "b" \c`:           `"a \"b\" \\c"`,         // escape quotes and backslash
+	}
+	for in, want := range cases {
+		if got := yamlQuote(in); got != want {
+			t.Errorf("yamlQuote(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestRenderTemplate_NoLeftoverTokens(t *testing.T) {
 	out := renderTemplate("{WORLD_NAME}/{FLS_SECRET}", map[string]string{
 		"WORLD_NAME": "x", "FLS_SECRET": "y",
