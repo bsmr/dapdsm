@@ -18,6 +18,7 @@ import (
 	"go.muehmer.eu/dapdsm/pkg/domain/worldsetup"
 	"go.muehmer.eu/dapdsm/pkg/transport/clusteraccess"
 	"go.muehmer.eu/dapdsm/pkg/transport/kube"
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 // bringupDeps are the orchestration's side effects, injected for tests.
@@ -30,7 +31,7 @@ type bringupDeps struct {
 	loadImg            func(ctx context.Context, target config.Target) error
 	reconcileImageTags func(ctx context.Context, target config.Target) error
 	initDB             func(ctx context.Context, stdout, stderr io.Writer) error
-	reconcile          func(ctx context.Context, stdout, stderr io.Writer) error
+	reconcile          func(ctx context.Context, cfg config.Config, stdout, stderr io.Writer) error
 	readToken          func(path string) ([]byte, error)
 }
 
@@ -102,7 +103,7 @@ func runBringup(ctx context.Context, in resolveInput, stdin *bufio.Reader, stdou
 		return fmt.Errorf("bringup: init-db: %w", err)
 	}
 	fmt.Fprintln(stdout, "bringup: reconcile")
-	if err := d.reconcile(ctx, stdout, stderr); err != nil {
+	if err := d.reconcile(ctx, res.Cfg, stdout, stderr); err != nil {
 		return fmt.Errorf("bringup: reconcile: %w", err)
 	}
 	fmt.Fprintln(stdout, "bringup: done — BattleGroup is coming up")
@@ -143,13 +144,27 @@ type ccKubectl struct{ a *clusteraccess.Access }
 func (k ccKubectl) Get(ctx context.Context, args ...string) ([]byte, error) {
 	res, err := k.a.Kubectl(ctx, args...)
 	if err != nil {
-		return nil, err
+		return nil, kubectlErr(res, err)
 	}
 	return []byte(res.Stdout), nil
 }
 
 func (k ccKubectl) Apply(ctx context.Context, manifest []byte) error {
-	_, err := k.a.KubectlStdin(ctx, manifest, "apply", "-f", "-")
+	res, err := k.a.KubectlStdin(ctx, manifest, "apply", "-f", "-")
+	return kubectlErr(res, err)
+}
+
+// kubectlErr augments a clusteraccess error with the command's stderr. The bare
+// ssh exec error is only "exit status 1"; callers that match on kubectl's
+// "NotFound" text (e.g. clusterconfig.Load) need the server message, which lands
+// on stderr. Returns nil when err is nil.
+func kubectlErr(res ssh.Result, err error) error {
+	if err == nil {
+		return nil
+	}
+	if s := strings.TrimSpace(res.Stderr); s != "" {
+		return fmt.Errorf("%w: %s", err, s)
+	}
 	return err
 }
 
@@ -158,12 +173,12 @@ type ilKubectl struct{ a *clusteraccess.Access }
 
 func (k ilKubectl) Run(ctx context.Context, args ...string) (string, error) {
 	res, err := k.a.Kubectl(ctx, args...)
-	return res.Stdout, err
+	return res.Stdout, kubectlErr(res, err)
 }
 
 func (k ilKubectl) Stdin(ctx context.Context, stdin []byte, args ...string) (string, error) {
 	res, err := k.a.KubectlStdin(ctx, stdin, args...)
-	return res.Stdout, err
+	return res.Stdout, kubectlErr(res, err)
 }
 
 // wsSeam adapts *clusteraccess.Access to worldsetup.Seam.
@@ -300,8 +315,12 @@ func defaultBringupDeps(a *clusteraccess.Access, jumpAddr string, stderr io.Writ
 		initDB: func(ctx context.Context, stdout, stderr io.Writer) error {
 			return initDBCmd(ctx, nil, stdout, stderr)
 		},
-		reconcile: func(ctx context.Context, stdout, stderr io.Writer) error {
-			return reconcileCmd(ctx, nil, stdout, stderr)
+		reconcile: func(ctx context.Context, cfg config.Config, stdout, stderr io.Writer) error {
+			// Multi-node: drive reconcile from the cluster-resident config
+			// (just promoted), not the workstation's absent /etc/dune/dunectl.env.
+			// bestEffortIniSet=true: the single-node ini-set steps (ServerDisplayName/
+			// Password) warn instead of aborting — K8s-native ini-set is block ②d.
+			return reconcileWithConfig(ctx, cfg, nil, true, stdout, stderr)
 		},
 		readToken: os.ReadFile,
 	}

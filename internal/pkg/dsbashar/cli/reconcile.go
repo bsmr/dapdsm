@@ -21,6 +21,11 @@ type reconcileDeps struct {
 	patchPorts func(ctx context.Context, gameBase, igwBase int, stdout, stderr io.Writer) error
 	enableSet  func(ctx context.Context, m string, stdout, stderr io.Writer) error
 	iniSet     func(ctx context.Context, key, value string, applyRestart bool, stdout, stderr io.Writer) error
+	// bestEffortIniSet downgrades ini-set failures to warnings. The ini-set
+	// path is single-node (local UserEngine.ini + vendor wrapper); multi-node
+	// bring-up sets this so a missing-file failure does not abort an otherwise
+	// complete bring-up. The K8s-native ini-set is deferred to block ②d.
+	bestEffortIniSet bool
 }
 
 func reconcileCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -28,10 +33,21 @@ func reconcileCmd(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	if err != nil {
 		return err
 	}
+	// Single-node: ini-set edits the local UserEngine.ini and must hard-fail.
+	return reconcileWithConfig(ctx, cfg, args, false, stdout, stderr)
+}
+
+// reconcileWithConfig runs the reconcile pipeline against an explicit config
+// instead of /etc/dune/dunectl.env. Multi-node bring-up uses this with the
+// cluster-resident config (promoted to the dapdsm ConfigMap), since the
+// workstation has no local dunectl.env, and with bestEffortIniSet=true so the
+// single-node ini-set steps warn instead of aborting (K8s-native ini-set is ②d).
+func reconcileWithConfig(ctx context.Context, cfg config.Config, args []string, bestEffortIniSet bool, stdout, stderr io.Writer) error {
 	deps := reconcileDeps{
-		cfg:     cfg,
-		initDB:  func(ctx context.Context, out, errw io.Writer) error { return initDBCmd(ctx, nil, out, errw) },
-		patchBg: func(ctx context.Context, out, errw io.Writer) error { return patchBattlegroupCmd(ctx, nil, out, errw) },
+		cfg:              cfg,
+		bestEffortIniSet: bestEffortIniSet,
+		initDB:           func(ctx context.Context, out, errw io.Writer) error { return initDBCmd(ctx, nil, out, errw) },
+		patchBg:          func(ctx context.Context, out, errw io.Writer) error { return patchBattlegroupCmd(ctx, nil, out, errw) },
 		patchPorts: func(ctx context.Context, gb, ib int, out, errw io.Writer) error {
 			return patchGamePortsCmd(ctx,
 				[]string{"--game-base", fmt.Sprint(gb), "--igw-base", fmt.Sprint(ib)},
@@ -112,7 +128,10 @@ func runReconcile(ctx context.Context, args []string, stdout, stderr io.Writer, 
 	if deps.cfg.ServerDisplayName != "" {
 		fmt.Fprintln(stdout, "reconcile: ini-set Bgd.ServerDisplayName")
 		if err := deps.iniSet(ctx, "Bgd.ServerDisplayName", deps.cfg.ServerDisplayName, false, stdout, stderr); err != nil {
-			return fmt.Errorf("reconcile ini-set ServerDisplayName: %w", err)
+			if !deps.bestEffortIniSet {
+				return fmt.Errorf("reconcile ini-set ServerDisplayName: %w", err)
+			}
+			fmt.Fprintf(stderr, "reconcile: WARN ServerDisplayName not applied (ini-set is single-node; deferred to ②d): %v\n", err)
 		}
 	}
 
@@ -126,7 +145,10 @@ func runReconcile(ctx context.Context, args []string, stdout, stderr io.Writer, 
 		}
 		fmt.Fprintln(stdout, "reconcile: ini-set Bgd.ServerLoginPassword (--apply --restart)")
 		if err := deps.iniSet(ctx, "Bgd.ServerLoginPassword", string(pw), true, stdout, stderr); err != nil {
-			return fmt.Errorf("reconcile ini-set ServerLoginPassword: %w", err)
+			if !deps.bestEffortIniSet {
+				return fmt.Errorf("reconcile ini-set ServerLoginPassword: %w", err)
+			}
+			fmt.Fprintf(stderr, "reconcile: WARN ServerLoginPassword not applied (ini-set is single-node; deferred to ②d): %v\n", err)
 		}
 	}
 
