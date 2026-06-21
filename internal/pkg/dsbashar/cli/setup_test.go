@@ -57,8 +57,10 @@ func TestRunSetup_PipesNameRegionTokenInOrder(t *testing.T) {
 func TestRunSetup_RejectsUnsafeWorldName(t *testing.T) {
 	t.Parallel()
 	cfg := config.Config{
-		Target:      config.TargetProd,
-		WorldName:   "Hadesnet: Offworld",
+		Target: config.TargetProd,
+		// A newline is a control char: it would break both the YAML title line
+		// and the setup.sh stdin prompt. Spaces/colons are now valid (quoted).
+		WorldName:   "World\nInjection",
 		WorldRegion: "Europe",
 	}
 	run := &fakeSetupRun{}

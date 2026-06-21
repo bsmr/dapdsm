@@ -119,8 +119,9 @@ func TestCreateWorld_NamespaceAndCreates(t *testing.T) {
 	if len(s.stdinArgs) != 3 {
 		t.Fatalf("want 3 `create -f -` calls, got %d", len(s.stdinArgs))
 	}
-	// CR carries the placeholder tag, substituted WorldName, and targets the ns.
-	if !bytes.Contains(s.stdin[2], []byte("world: MyBG")) ||
+	// CR carries the placeholder tag and the WorldName as a YAML-quoted scalar
+	// (the title slot is bare in the template), and targets the ns.
+	if !bytes.Contains(s.stdin[2], []byte(`world: "MyBG"`)) ||
 		!bytes.Contains(s.stdin[2], []byte("tag: 0-0-shipping")) {
 		t.Errorf("CR stdin not rendered: %s", s.stdin[2])
 	}

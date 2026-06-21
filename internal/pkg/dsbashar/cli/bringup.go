@@ -52,6 +52,13 @@ func runBringup(ctx context.Context, in resolveInput, stdin *bufio.Reader, stdou
 		return err // includes errAbort with the doctor hint
 	}
 
+	// Enforce the WorldName/title constraint on every resolution path (flags,
+	// wizard, cluster) before it is rendered into the CR — worldsetup quotes it,
+	// but a control character (newline) would still break the YAML/stdin.
+	if !config.ValidWorldName(res.Cfg.WorldName) {
+		return fmt.Errorf("bringup: invalid WorldName %q: 1-%d chars, no control characters", res.Cfg.WorldName, 50)
+	}
+
 	token, err := d.readToken(res.FLSTokenPath)
 	if err != nil {
 		return fmt.Errorf("bringup: read FLS token: %w", err)
