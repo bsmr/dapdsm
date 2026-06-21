@@ -35,8 +35,14 @@ type Store struct {
 	Namespace string
 }
 
-// Save renders the ConfigMap + Secret and applies both idempotently.
+// Save ensures the namespace exists, then renders the ConfigMap + Secret and
+// applies all three idempotently (batteries-included: a fresh cluster has no
+// dapdsm namespace yet).
 func (s Store) Save(ctx context.Context, name string, d Data) error {
+	ns := "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: " + s.Namespace + "\n"
+	if err := s.KC.Apply(ctx, []byte(ns)); err != nil {
+		return fmt.Errorf("apply namespace %s: %w", s.Namespace, err)
+	}
 	cm := renderConfigMap(s.Namespace, name, d.Values)
 	if err := s.KC.Apply(ctx, []byte(cm)); err != nil {
 		return fmt.Errorf("apply configmap %s: %w", name, err)
@@ -48,37 +54,66 @@ func (s Store) Save(ctx context.Context, name string, d Data) error {
 	return nil
 }
 
-// Load reads the merged ConfigMap+Secret JSON and decodes it. The Get call
-// fetches both objects' data maps as one JSON document (see args below).
+// Load reads the ConfigMap and Secret separately with `kubectl get -o json` and
+// merges their `.data` maps. The ConfigMap is the existence signal: if it is
+// absent the record does not exist yet (ErrNotFound). A missing Secret is
+// tolerated (no secrets stored yet). Two plain `-o json` reads avoid the
+// fragile single-call jsonpath composite that real kubectl rejects.
 func (s Store) Load(ctx context.Context, name string) (Data, error) {
-	// jq-free: ask kubectl for a tiny composite via two -o jsonpath reads would
-	// need two calls; instead read both as json and merge here.
-	out, err := s.KC.Get(ctx, "get",
-		"configmap", name, "secret", name+"-secrets",
-		"-n", s.Namespace, "-o",
-		`jsonpath={"{\"cm\":"}{.items[0].data}{,\"secret\":}{.items[1].data}{"}"}`)
+	cmRaw, err := s.KC.Get(ctx, "get", "configmap", name, "-n", s.Namespace, "-o", "json")
 	if err != nil {
-		if strings.Contains(err.Error(), "NotFound") || strings.Contains(err.Error(), "not found") {
+		if isNotFound(err) {
 			return Data{}, ErrNotFound
 		}
-		return Data{}, fmt.Errorf("get %s: %w", name, err)
+		return Data{}, fmt.Errorf("get configmap %s: %w", name, err)
 	}
-	var raw struct {
-		CM     map[string]string `json:"cm"`
-		Secret map[string]string `json:"secret"`
+	values, err := dataMap(cmRaw)
+	if err != nil {
+		return Data{}, fmt.Errorf("parse configmap %s: %w", name, err)
 	}
-	if err := json.Unmarshal(out, &raw); err != nil {
-		return Data{}, fmt.Errorf("parse %s: %w", name, err)
+
+	secRaw, err := s.KC.Get(ctx, "get", "secret", name+"-secrets", "-n", s.Namespace, "-o", "json")
+	if err != nil {
+		if isNotFound(err) {
+			// ConfigMap exists but no Secret yet: a valid record with no secrets.
+			return Data{Values: values, Secrets: map[string][]byte{}}, nil
+		}
+		return Data{}, fmt.Errorf("get secret %s-secrets: %w", name, err)
 	}
-	d := Data{Values: raw.CM, Secrets: map[string][]byte{}}
-	for k, v := range raw.Secret {
+	encoded, err := dataMap(secRaw)
+	if err != nil {
+		return Data{}, fmt.Errorf("parse secret %s-secrets: %w", name, err)
+	}
+	secrets := make(map[string][]byte, len(encoded))
+	for k, v := range encoded {
 		dec, err := base64.StdEncoding.DecodeString(v)
 		if err != nil {
 			return Data{}, fmt.Errorf("decode secret %s: %w", k, err)
 		}
-		d.Secrets[k] = dec
+		secrets[k] = dec
 	}
-	return d, nil
+	return Data{Values: values, Secrets: secrets}, nil
+}
+
+// isNotFound reports whether err is kubectl's "resource not found" (the message
+// is surfaced from the command's stderr by the clusteraccess adapter).
+func isNotFound(err error) bool {
+	return strings.Contains(err.Error(), "NotFound") || strings.Contains(err.Error(), "not found")
+}
+
+// dataMap extracts the `.data` object from a `kubectl get -o json` document.
+// A resource with no data field yields an empty map, not an error.
+func dataMap(raw []byte) (map[string]string, error) {
+	var obj struct {
+		Data map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return nil, err
+	}
+	if obj.Data == nil {
+		obj.Data = map[string]string{}
+	}
+	return obj.Data, nil
 }
 
 func renderConfigMap(ns, name string, vals map[string]string) string {

@@ -41,6 +41,33 @@ func (s *stepRecorder) iniSet(_ context.Context, key, _ string, applyRestart boo
 	return nil
 }
 
+func TestReconcile_BestEffortIniSet(t *testing.T) {
+	t.Parallel()
+	failIniSet := func(_ context.Context, _, _ string, _ bool, _, _ io.Writer) error {
+		return os.ErrNotExist // simulate the single-node UserEngine.ini missing on multi-node
+	}
+	base := func(bestEffort bool) reconcileDeps {
+		return reconcileDeps{
+			cfg:              config.Config{Target: config.TargetProd, ServerDisplayName: "Ad Astra"},
+			initDB:           func(context.Context, io.Writer, io.Writer) error { return nil },
+			patchBg:          func(context.Context, io.Writer, io.Writer) error { return nil },
+			patchPorts:       func(context.Context, int, int, io.Writer, io.Writer) error { return nil },
+			enableSet:        func(context.Context, string, io.Writer, io.Writer) error { return nil },
+			iniSet:           failIniSet,
+			bestEffortIniSet: bestEffort,
+		}
+	}
+	var out, errOut bytes.Buffer
+	// best-effort: ini-set failure is downgraded to a warning, reconcile succeeds.
+	if err := runReconcile(context.Background(), nil, &out, &errOut, base(true)); err != nil {
+		t.Fatalf("best-effort: want nil, got %v", err)
+	}
+	// strict (single-node default): ini-set failure aborts.
+	if err := runReconcile(context.Background(), nil, &out, &errOut, base(false)); err == nil {
+		t.Fatalf("strict: want error, got nil")
+	}
+}
+
 func TestReconcile_RunsMinimalSequenceWhenOnlyTargetSet(t *testing.T) {
 	t.Parallel()
 	rec := &stepRecorder{}
