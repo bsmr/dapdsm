@@ -16,7 +16,7 @@ type initDBDeps struct {
 }
 
 func defaultInitDBDeps(stderr io.Writer) initDBDeps {
-	return initDBDeps{runner: &kube.CmdRunner{Stderr: stderr}}
+	return initDBDeps{runner: newKubeRunner(stderr)}
 }
 
 func initDBCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {

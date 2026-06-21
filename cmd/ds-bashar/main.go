@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"go.muehmer.eu/dapdsm/internal/pkg/dsbashar/cli"
+	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
 func main() {
@@ -28,5 +29,5 @@ func main() {
 func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	return cli.Run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	return cli.Run(ctx, os.Args[1:], ssh.NewClient(), os.Stdin, os.Stdout, os.Stderr)
 }

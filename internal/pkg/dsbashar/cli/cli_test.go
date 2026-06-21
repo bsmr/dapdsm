@@ -11,7 +11,7 @@ import (
 func TestRun_NoArgs_ReturnsErrUsageAndPrintsUsageToStderr(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	err := Run(context.Background(), nil, nil, &stdout, &stderr)
+	err := Run(context.Background(), nil, stubExecer{}, nil, &stdout, &stderr)
 	if !errors.Is(err, ErrUsage) {
 		t.Fatalf("Run() err = %v, want errors.Is(err, ErrUsage)", err)
 	}
@@ -29,7 +29,7 @@ func TestRun_HelpFlavors_PrintUsageToStdout(t *testing.T) {
 		t.Run(arg, func(t *testing.T) {
 			t.Parallel()
 			var stdout, stderr bytes.Buffer
-			if err := Run(context.Background(), []string{arg}, nil, &stdout, &stderr); err != nil {
+			if err := Run(context.Background(), []string{arg}, stubExecer{}, nil, &stdout, &stderr); err != nil {
 				t.Fatalf("Run(%q) err = %v, want nil", arg, err)
 			}
 			if !strings.Contains(stdout.String(), "Usage:") {
@@ -45,7 +45,7 @@ func TestRun_HelpFlavors_PrintUsageToStdout(t *testing.T) {
 func TestRun_UnknownSubcommand_ReturnsErrUsage(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	err := Run(context.Background(), []string{"frobnicate"}, nil, &stdout, &stderr)
+	err := Run(context.Background(), []string{"frobnicate"}, stubExecer{}, nil, &stdout, &stderr)
 	if !errors.Is(err, ErrUsage) {
 		t.Errorf("Run() err = %v, want errors.Is(err, ErrUsage)", err)
 	}

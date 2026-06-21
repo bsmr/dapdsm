@@ -32,7 +32,7 @@ type applyPlayerIPDeps struct {
 
 func defaultApplyPlayerIPDeps(stderr io.Writer) applyPlayerIPDeps {
 	return applyPlayerIPDeps{
-		runner:     &kube.CmdRunner{Stderr: stderr},
+		runner:     newKubeRunner(stderr),
 		resolver:   &publicip.HTTPResolver{},
 		restartK3s: restartK3sViaSudo,
 		writeFile:  writeFile0644,

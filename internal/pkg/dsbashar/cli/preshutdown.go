@@ -22,7 +22,7 @@ type preShutdownDeps struct {
 
 func preShutdownCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	return runPreShutdown(ctx, args, stdout, stderr, preShutdownDeps{
-		runner:       &kube.CmdRunner{Stderr: stderr},
+		runner:       newKubeRunner(stderr),
 		runVendor:    execVendor,
 		announceDeps: defaultAnnounceDeps(),
 	})

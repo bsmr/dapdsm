@@ -167,6 +167,25 @@ func (c *CmdRunner) DeletePods(ctx context.Context, namespace string, selectors 
 	return nil
 }
 
+// ListBattleGroupNamespaces returns every BattleGroup namespace (prefix
+// funcom-seabass-) on the cluster, in the order kubectl lists them. Empty
+// slice (not an error) when no BattleGroup exists yet — the fresh-cluster case
+// the bring-up gate keys on.
+func ListBattleGroupNamespaces(ctx context.Context, r Getter) ([]string, error) {
+	out, err := r.Get(ctx, "ns", "-o", "name")
+	if err != nil {
+		return nil, fmt.Errorf("list namespaces: %w", err)
+	}
+	var bgs []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		name := strings.TrimPrefix(strings.TrimSpace(line), "namespace/")
+		if strings.HasPrefix(name, "funcom-seabass-") {
+			bgs = append(bgs, name)
+		}
+	}
+	return bgs, nil
+}
+
 // FindBattleGroupNamespace returns the first namespace whose name has the
 // funcom-seabass- prefix. Errors when none exists.
 func FindBattleGroupNamespace(ctx context.Context, r Getter) (string, error) {

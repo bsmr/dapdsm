@@ -19,7 +19,7 @@ type setScalingDeps struct {
 }
 
 func defaultSetScalingDeps(stderr io.Writer) setScalingDeps {
-	return setScalingDeps{runner: &kube.CmdRunner{Stderr: stderr}}
+	return setScalingDeps{runner: newKubeRunner(stderr)}
 }
 
 func enableSetCmd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
