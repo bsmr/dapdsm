@@ -3,6 +3,7 @@ package operatorbringup
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // ops is the four Funcom operators, in apply/wait order.
@@ -19,15 +20,13 @@ type Kubectl interface {
 
 // Options configure the operator bring-up.
 type Options struct {
-	Registry       string   // S2 endpoint host:port (image-ref-rewrite target)
-	Version        string   // operator version (from version.txt)
-	CRDDir         string   // operator CRD dir on the jumphost
-	CertManagerURL string   // empty => skip cert-manager (assume present)
-	Workers        []string // worker node names to label
+	Version        string // operator version (from version.txt)
+	CRDDir         string // operator CRD dir on the jumphost
+	CertManagerURL string // empty => skip cert-manager (assume present)
 }
 
 // BringUp performs the operator bring-up: cert-manager (optional) -> namespace ->
-// worker labels -> CRDs -> webhook secrets -> operator Deployments+RBAC -> wait.
+// worker discovery + labels -> CRDs -> webhook secrets -> operator Deployments+RBAC -> wait.
 func BringUp(ctx context.Context, kc Kubectl, opts Options) error {
 	if err := installCertManager(ctx, kc, opts.CertManagerURL); err != nil {
 		return err
@@ -36,7 +35,11 @@ func BringUp(ctx context.Context, kc Kubectl, opts Options) error {
 	if _, err := kc.Apply(ctx, []byte(nsManifest)); err != nil {
 		return fmt.Errorf("apply namespace: %w", err)
 	}
-	if err := labelWorkers(ctx, kc, opts.Workers); err != nil {
+	workers, err := workerNodes(ctx, kc)
+	if err != nil {
+		return err
+	}
+	if err := labelWorkers(ctx, kc, workers); err != nil {
 		return err
 	}
 	if _, err := kc.Run(ctx, "apply", "--server-side", "--validate=false", "-f", opts.CRDDir); err != nil {
@@ -54,7 +57,7 @@ func BringUp(ctx context.Context, kc Kubectl, opts Options) error {
 			}
 		}
 	}
-	manifest, err := renderOperators(opts.Version, opts.Registry)
+	manifest, err := renderOperators(opts.Version)
 	if err != nil {
 		return err
 	}
@@ -67,6 +70,27 @@ func BringUp(ctx context.Context, kc Kubectl, opts Options) error {
 		}
 	}
 	return nil
+}
+
+// workerNodes lists the cluster's worker nodes via the API: every node WITHOUT
+// the control-plane role label. K8s-native + always current (new/removed workers
+// are reflected automatically) — no inventory needed.
+// ponytail: keys off node-role.kubernetes.io/control-plane (set by rke2 servers
+// and k3s masters). Ceiling: a dedicated etcd-only node (labeled etcd but not
+// control-plane) would be miscounted as a worker; add !…/etcd,!…/master to the
+// selector if a cluster ever has standalone etcd nodes.
+func workerNodes(ctx context.Context, kc Kubectl) ([]string, error) {
+	out, err := kc.Run(ctx, "get", "nodes",
+		"-l", "!node-role.kubernetes.io/control-plane",
+		"-o", "jsonpath={.items[*].metadata.name}")
+	if err != nil {
+		return nil, fmt.Errorf("list worker nodes: %w", err)
+	}
+	workers := strings.Fields(out)
+	if len(workers) == 0 {
+		return nil, fmt.Errorf("no worker nodes found (all nodes control-plane?)")
+	}
+	return workers, nil
 }
 
 // installCertManager applies a caller-supplied cert-manager release idempotently.

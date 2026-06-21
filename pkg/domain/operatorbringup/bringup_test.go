@@ -23,7 +23,11 @@ type fakeKubectl struct {
 func (f *fakeKubectl) Run(_ context.Context, args ...string) (string, error) {
 	f.runs = append(f.runs, args)
 	f.calls = append(f.calls, "run:"+strings.Join(args, " "))
-	// Simulate a fresh cluster: any "get <resource> ..." call returns notFound so
+	// Return worker nodes for kubectl get nodes queries.
+	if len(args) >= 2 && args[0] == "get" && args[1] == "nodes" {
+		return "w1 w2", nil
+	}
+	// Simulate a fresh cluster: any other "get <resource> ..." call returns notFound so
 	// that existence guards (cert-manager deployment, webhook secrets) all take
 	// their apply path.
 	if len(args) >= 1 && args[0] == "get" {
@@ -63,10 +67,9 @@ func runIndex(runs [][]string, sub string) int {
 func TestBringUp_OrdersAndCovers(t *testing.T) {
 	f := &fakeKubectl{}
 	opts := Options{
-		Registry: "10.0.0.9:5000", Version: "v1.5.0",
+		Version:        "v1.5.0",
 		CRDDir:         "/home/dune/depot/prod/images/operators/crds",
 		CertManagerURL: "https://example/cert-manager.yaml",
-		Workers:        []string{"worker-1", "worker-2", "worker-3"},
 	}
 	if err := BringUp(context.Background(), f, opts); err != nil {
 		t.Fatalf("BringUp: %v", err)
@@ -82,8 +85,8 @@ func TestBringUp_OrdersAndCovers(t *testing.T) {
 	if !strings.Contains(joinedRuns, "cert-manager.yaml") {
 		t.Error("cert-manager url not applied")
 	}
-	// all 3 workers labeled
-	for _, w := range opts.Workers {
+	// workers discovered via kubectl get nodes and labeled
+	for _, w := range []string{"w1", "w2"} {
 		if !strings.Contains(joinedRuns, "label node "+w+" node.funcom.com/workload=infrastructure --overwrite") {
 			t.Errorf("worker %s not labeled", w)
 		}
@@ -140,13 +143,36 @@ func TestBringUp_OrdersAndCovers(t *testing.T) {
 			t.Errorf("op %s not waited", op)
 		}
 	}
+	// get nodes call must appear between namespace apply and CRD apply (ordering check)
+	getNodesCallIdx := -1
+	nsApplyIdx := -1
+	for i, c := range f.calls {
+		if nsApplyIdx == -1 && c == "apply-stdin:namespace" {
+			nsApplyIdx = i
+		}
+		if getNodesCallIdx == -1 && strings.Contains(c, "get nodes") {
+			getNodesCallIdx = i
+		}
+	}
+	if nsApplyIdx == -1 || getNodesCallIdx == -1 {
+		t.Errorf("namespace apply or get nodes not found in calls: nsApplyIdx=%d getNodesCallIdx=%d",
+			nsApplyIdx, getNodesCallIdx)
+	}
+	if nsApplyIdx > getNodesCallIdx {
+		t.Errorf("namespace apply must come before get nodes: nsApplyIdx=%d getNodesCallIdx=%d",
+			nsApplyIdx, getNodesCallIdx)
+	}
+	if getNodesCallIdx > unifCRDIdx {
+		t.Errorf("get nodes must come before CRD apply: getNodesCallIdx=%d unifCRDIdx=%d",
+			getNodesCallIdx, unifCRDIdx)
+	}
 }
 
 func TestBringUp_SkipsCertManagerWhenURLEmpty(t *testing.T) {
 	f := &fakeKubectl{}
 	opts := Options{
-		Registry: "r:5000", Version: "v1", CRDDir: "/d/crds",
-		CertManagerURL: "", Workers: []string{"w1"},
+		Version: "v1", CRDDir: "/d/crds",
+		CertManagerURL: "",
 	}
 	if err := BringUp(context.Background(), f, opts); err != nil {
 		t.Fatalf("BringUp: %v", err)
@@ -158,3 +184,59 @@ func TestBringUp_SkipsCertManagerWhenURLEmpty(t *testing.T) {
 	}
 }
 
+func TestWorkerNodes(t *testing.T) {
+	t.Run("returns worker names", func(t *testing.T) {
+		f := &fakeKubectl{}
+		got, err := workerNodes(context.Background(), f)
+		if err != nil {
+			t.Fatalf("workerNodes: %v", err)
+		}
+		// fakeKubectl returns "w1 w2" for get nodes calls
+		if len(got) != 2 || got[0] != "w1" || got[1] != "w2" {
+			t.Errorf("unexpected nodes: %v", got)
+		}
+		// assert argv contains expected args
+		if len(f.runs) == 0 {
+			t.Fatal("no runs recorded")
+		}
+		joined := strings.Join(f.runs[0], " ")
+		if !strings.Contains(joined, "get nodes") {
+			t.Errorf("expected get nodes in args, got: %s", joined)
+		}
+		if !strings.Contains(joined, "!node-role.kubernetes.io/control-plane") {
+			t.Errorf("expected label selector in args, got: %s", joined)
+		}
+		if !strings.Contains(joined, "jsonpath={.items[*].metadata.name}") {
+			t.Errorf("expected jsonpath in args, got: %s", joined)
+		}
+	})
+
+	t.Run("errors on empty output", func(t *testing.T) {
+		// fakeKubectl that returns empty for get nodes
+		emptyKC := &emptyNodesKubectl{}
+		_, err := workerNodes(context.Background(), emptyKC)
+		if err == nil {
+			t.Fatal("expected error when no worker nodes found")
+		}
+		if !strings.Contains(err.Error(), "no worker nodes found") {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}
+
+// emptyNodesKubectl returns empty string for get nodes calls (simulates
+// a cluster where all nodes are control-plane).
+type emptyNodesKubectl struct{}
+
+func (e *emptyNodesKubectl) Run(_ context.Context, args ...string) (string, error) {
+	if len(args) >= 2 && args[0] == "get" && args[1] == "nodes" {
+		return "", nil
+	}
+	if len(args) >= 1 && args[0] == "get" {
+		return "", errors.New("not found")
+	}
+	return "", nil
+}
+func (e *emptyNodesKubectl) Apply(_ context.Context, _ []byte) (string, error) {
+	return "", nil
+}

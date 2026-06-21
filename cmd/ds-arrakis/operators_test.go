@@ -10,7 +10,8 @@ import (
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
-// opExecer answers cat (version.txt + inventory) and records kubectl runs/stdin.
+// opExecer answers cat (version.txt) and records kubectl runs/stdin.
+// It also returns worker node names for kubectl get nodes calls.
 type opExecer struct {
 	stdin [][]byte
 	runs  [][]string
@@ -22,11 +23,15 @@ func (e *opExecer) Run(_ context.Context, host, cmd string, args ...string) (ssh
 		if strings.Contains(args[len(args)-1], "version.txt") {
 			return ssh.Result{Stdout: "v1.5.0\n"}, nil
 		}
-		return ssh.Result{Stdout: opInventoryYAML}, nil
+		return ssh.Result{Stdout: ""}, nil
 	}
 	// CRD dir preflight: `test -d <dir>` — dir present by default.
 	if cmd == "test" {
 		return ssh.Result{}, nil
+	}
+	// kubectl get nodes: return worker node names so workerNodes() succeeds.
+	if cmd == "env" && containsArg(args, "get") && containsArg(args, "nodes") {
+		return ssh.Result{Stdout: "w1 w2"}, nil
 	}
 	// `get secret` must fail so the webhook-secret apply path runs
 	if cmd == "env" && containsArg(args, "get") {
@@ -56,8 +61,8 @@ func TestOperatorsCmd_Bringup(t *testing.T) {
 	e := &opExecer{}
 	var out, errOut bytes.Buffer
 	err := operatorsCmd(context.Background(), e, []string{
-		"bringup", "--jump", "j", "--kubeconfig", "/kc", "--inventory", "/inv",
-		"--env", "prod", "--registry", "10.0.0.9:5000",
+		"bringup", "--jump", "j", "--kubeconfig", "/kc",
+		"--env", "prod",
 	}, &out, &errOut)
 	if err != nil {
 		t.Fatalf("operatorsCmd: %v\nstderr: %s", err, errOut.String())
@@ -66,12 +71,12 @@ func TestOperatorsCmd_Bringup(t *testing.T) {
 	sawOperators := false
 	for _, m := range e.stdin {
 		if strings.Contains(string(m), "battlegroupoperator-controller-manager") &&
-			strings.Contains(string(m), "10.0.0.9:5000/funcom/self-hosting/igw-k8s-battlegroup-operator:v1.5.0") {
+			strings.Contains(string(m), "registry.funcom.com/funcom/self-hosting/igw-k8s-battlegroup-operator:v1.5.0") {
 			sawOperators = true
 		}
 	}
 	if !sawOperators {
-		t.Error("operator manifest not applied via stdin with rewritten image")
+		t.Error("operator manifest not applied via stdin with original registry.funcom.com ref")
 	}
 }
 
@@ -103,8 +108,8 @@ func TestOperatorsCmd_MissingCRDDir(t *testing.T) {
 	e := &missingCRDExecer{}
 	var out, errOut bytes.Buffer
 	err := operatorsCmd(context.Background(), e, []string{
-		"bringup", "--jump", "j", "--kubeconfig", "/kc", "--inventory", "/inv",
-		"--env", "prod", "--registry", "10.0.0.9:5000",
+		"bringup", "--jump", "j", "--kubeconfig", "/kc",
+		"--env", "prod",
 	}, &out, &errOut)
 	if err == nil {
 		t.Fatal("expected error when CRD dir is absent")
@@ -115,13 +120,3 @@ func TestOperatorsCmd_MissingCRDDir(t *testing.T) {
 }
 
 var _ clusteraccess.Execer = (*opExecer)(nil)
-
-const opInventoryYAML = `all:
-  vars:
-    ansible_user: dune
-    ansible_ssh_private_key_file: /home/dune/.keys/id_ed25519
-  children:
-    worker:
-      hosts:
-        worker-1: {ansible_host: 10.0.0.21}
-`

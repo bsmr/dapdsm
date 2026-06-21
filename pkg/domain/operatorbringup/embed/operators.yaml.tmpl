@@ -55,7 +55,7 @@ spec:
         - --dr-max-concurrent=2
         - --sr-max-concurrent=2
         - --cfo-taints-ignore=node.kubernetes.io/unschedulable,node.funcom.com/new
-        image: {{ .Registry }}/funcom/self-hosting/igw-k8s-battlegroup-operator:{{ .Version }}
+        image: registry.funcom.com/funcom/self-hosting/igw-k8s-battlegroup-operator:{{ .Version }}
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9443
@@ -104,7 +104,7 @@ spec:
         - --dbr-max-concurrent=1
         - --dbm-max-concurrent=1
         - --dbutil-supports-prometheus=false
-        image: {{ .Registry }}/funcom/self-hosting/igw-k8s-database-operator:{{ .Version }}
+        image: registry.funcom.com/funcom/self-hosting/igw-k8s-database-operator:{{ .Version }}
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9443
@@ -146,7 +146,7 @@ spec:
         - --zap-time-encoding=iso8601
         - --sg-max-concurrent=2
         - --ss-max-concurrent=2
-        image: {{ .Registry }}/funcom/self-hosting/igw-k8s-server-operator:{{ .Version }}
+        image: registry.funcom.com/funcom/self-hosting/igw-k8s-server-operator:{{ .Version }}
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9443
@@ -191,7 +191,7 @@ spec:
         - --fb-max-concurrent=1
         - --mq-max-concurrent=2
         - --tr-max-concurrent=2
-        image: {{ .Registry }}/funcom/self-hosting/igw-k8s-utilities-operator:{{ .Version }}
+        image: registry.funcom.com/funcom/self-hosting/igw-k8s-utilities-operator:{{ .Version }}
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9443

@@ -6,17 +6,23 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strings"
 
 	"go.muehmer.eu/dapdsm/pkg/domain/bootstrap"
 	"go.muehmer.eu/dapdsm/pkg/domain/depot"
 	"go.muehmer.eu/dapdsm/pkg/domain/imagedist"
+	"go.muehmer.eu/dapdsm/pkg/domain/imageload"
 	"go.muehmer.eu/dapdsm/pkg/transport/clusteraccess"
 	"go.muehmer.eu/dapdsm/pkg/transport/skopeo"
 	"go.muehmer.eu/dapdsm/pkg/transport/ssh"
 )
 
-// kubectlAdapter bridges *clusteraccess.Access to imagedist.Kubectl: Run
-// unwraps stdout; Apply pipes a manifest to `kubectl apply -f -`.
+// kubectlAdapter bridges *clusteraccess.Access to imagedist.Kubectl and
+// imageload.Kubectl + imageload.Reader.
+//
+// Run unwraps stdout; Apply pipes a manifest to `kubectl apply -f -`;
+// Stdin pipes arbitrary bytes into a kubectl subcommand;
+// ReadFile fetches a file from the jumphost via `cat`.
 type kubectlAdapter struct{ a *clusteraccess.Access }
 
 func (k kubectlAdapter) Run(ctx context.Context, args ...string) (string, error) {
@@ -27,6 +33,20 @@ func (k kubectlAdapter) Apply(ctx context.Context, manifest []byte) (string, err
 	res, err := k.a.KubectlStdin(ctx, manifest, "apply", "-f", "-")
 	return res.Stdout, err
 }
+func (k kubectlAdapter) Stdin(ctx context.Context, stdin []byte, args ...string) (string, error) {
+	res, err := k.a.KubectlStdin(ctx, stdin, args...)
+	return res.Stdout, err
+}
+
+// ReadFile reads a file on the jumphost (binary-safe: ssh.Result.Stdout is a
+// verbatim byte-buffer cast). Used by imageload.Reader to fetch the staged tars.
+func (k kubectlAdapter) ReadFile(ctx context.Context, filePath string) ([]byte, error) {
+	res, err := k.a.OnJump(ctx, "cat", filePath)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(res.Stdout), nil
+}
 
 // realImagesRunner builds the production jumphost-bound skopeo.Runner.
 // It reuses jumpRunner (defined in depot.go) so all SSH exec goes through
@@ -35,12 +55,26 @@ func realImagesRunner(jump string) skopeo.Runner {
 	return jumpRunner{ex: ssh.NewClient(), host: jump}
 }
 
-// imagesCmd handles `ds-arrakis images distribute …`.
+// imagesCmd dispatches `ds-arrakis images <distribute|load> …` to the
+// appropriate subcommand handler.
 func imagesCmd(ctx context.Context, ex clusteraccess.Execer, newRunner func(jump string) skopeo.Runner, args []string, stdout, stderr io.Writer) error {
-	if len(args) == 0 || args[0] != "distribute" {
-		fmt.Fprintln(stderr, "usage: ds-arrakis images distribute --jump <alias> --kubeconfig <path> --inventory <path> --env <prod|test> [flags]")
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage: ds-arrakis images <distribute|load> [flags]")
 		return ErrUsage
 	}
+	switch args[0] {
+	case "distribute":
+		return distributeCmd(ctx, ex, newRunner, args, stdout, stderr)
+	case "load":
+		return loadCmd(ctx, ex, args[1:], stdout, stderr)
+	default:
+		fmt.Fprintln(stderr, "usage: ds-arrakis images <distribute|load> [flags]")
+		return ErrUsage
+	}
+}
+
+// distributeCmd handles `ds-arrakis images distribute …`.
+func distributeCmd(ctx context.Context, ex clusteraccess.Execer, newRunner func(jump string) skopeo.Runner, args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("images distribute", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	jump := fs.String("jump", "", "jumphost ssh-config alias (the control host)")
@@ -111,6 +145,69 @@ func imagesCmd(ctx context.Context, ex clusteraccess.Execer, newRunner func(jump
 	}
 	if !*noVerify {
 		fmt.Fprintln(stdout, "images: (verify probe is operator-gated; run with a probe Pod at live time)")
+	}
+	return nil
+}
+
+// loadCmd handles `ds-arrakis images load …` — batteries-included operator-image
+// load via the privileged import DaemonSet (no registry/StorageClass/registries.yaml).
+// No inventory required: the DaemonSet runs on all nodes; worker discovery is done
+// by listing the DaemonSet pods after rollout.
+func loadCmd(ctx context.Context, ex clusteraccess.Execer, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("images load", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	jump := fs.String("jump", "", "jumphost ssh-config alias (the control host)")
+	kubeconfig := fs.String("kubeconfig", "", "kubeconfig path on the jumphost")
+	env := fs.String("env", "", "target environment: prod|test")
+	staging := fs.String("staging", "", "depot staging dir on the jumphost (default /home/dune/depot/<env>)")
+	socket := fs.String("socket", "/run/k3s/containerd/containerd.sock", "host containerd socket")
+	ctr := fs.String("ctr", "/var/lib/rancher/rke2/bin/ctr", "host ctr binary path")
+	namespace := fs.String("namespace", "ds-arrakis-imageload", "import DaemonSet namespace")
+	keep := fs.Bool("keep", false, "leave the import DaemonSet running for fast re-imports")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *jump == "" || *kubeconfig == "" || *env == "" {
+		fmt.Fprintln(stderr, "images load: --jump, --kubeconfig and --env are required")
+		return ErrUsage
+	}
+	if _, err := bootstrap.AppID(*env); err != nil { // validates env (prod|test)
+		return err
+	}
+	dir := *staging
+	if dir == "" {
+		dir = path.Join("/home/dune/depot", *env)
+	}
+
+	access := clusteraccess.New(ex, &clusteraccess.Descriptor{
+		JumpHost:   *jump,
+		Kubeconfig: *kubeconfig,
+	})
+
+	// enumerate the operator tars on the jumphost
+	opDir := path.Join(dir, "images", "operators")
+	lsOut, err := access.OnJump(ctx, "sh", "-c", fmt.Sprintf("ls -1 '%s'/*.tar 2>/dev/null || true", opDir))
+	if err != nil {
+		return fmt.Errorf("list operator tars: %w", err)
+	}
+	var tars []string
+	for _, line := range strings.Split(lsOut.Stdout, "\n") {
+		if s := strings.TrimSpace(line); s != "" {
+			tars = append(tars, s)
+		}
+	}
+
+	adapter := kubectlAdapter{access}
+	fmt.Fprintf(stdout, "images load: %d operator tars -> import DaemonSet (ns %s)\n", len(tars), *namespace)
+	res, err := imageload.Load(ctx, adapter, adapter, imageload.Options{
+		Namespace: *namespace, Tars: tars,
+		Socket: *socket, CtrPath: *ctr, KeepDaemon: *keep,
+	})
+	if err != nil {
+		return err
+	}
+	for _, tar := range res.Tars {
+		fmt.Fprintf(stdout, "  loaded %s into %d nodes\n", path.Base(tar), len(res.Pods))
 	}
 	return nil
 }

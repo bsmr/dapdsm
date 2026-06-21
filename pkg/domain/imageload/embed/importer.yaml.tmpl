@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Namespace }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ds-arrakis-imageload
+  namespace: {{ .Namespace }}
+  labels:
+    app: ds-arrakis-imageload
+spec:
+  selector:
+    matchLabels:
+      app: ds-arrakis-imageload
+  template:
+    metadata:
+      labels:
+        app: ds-arrakis-imageload
+    spec:
+      containers:
+      - name: importer
+        image: busybox:1.36
+        command: ["sleep", "infinity"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: containerd-sock
+          mountPath: /host/containerd.sock
+        - name: ctr-bin
+          mountPath: /host/bin
+          readOnly: true
+      volumes:
+      - name: containerd-sock
+        hostPath:
+          path: {{ .Socket }}
+          type: Socket
+      - name: ctr-bin
+        hostPath:
+          path: {{ .CtrDir }}
+          type: Directory
