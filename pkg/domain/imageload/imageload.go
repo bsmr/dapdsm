@@ -153,14 +153,14 @@ type Jump interface {
 	OnJump(ctx context.Context, name string, args ...string) (ssh.Result, error)
 }
 
-// HTTPOptions configures the HTTP-fetch import path for a large tar.
+// HTTPOptions configures the HTTP-fetch import path for large tars.
 // Use this for tars that are too large for the kubectl-exec stream (~12 MB/s cap).
 type HTTPOptions struct {
 	Options
-	TarPathOnJump string // absolute tar path on the jumphost (base name becomes the URL path)
-	ServeDir      string // directory the jumphost file server roots at
-	ServePort     int    // port the file server listens on
-	JumpAddr      string // pod-reachable host:port for the importer pods to curl
+	TarPaths  []string // absolute tar paths on the jumphost; base names become URL paths
+	ServeDir  string   // directory the jumphost file server roots at
+	ServePort int      // port the file server listens on
+	JumpAddr  string   // pod-reachable host:port for the importer pods to fetch from
 }
 
 // LoadViaHTTP deploys the import DaemonSet, starts an ephemeral static file
@@ -199,18 +199,22 @@ func LoadViaHTTP(ctx context.Context, kc Kubectl, jp Jump, opts HTTPOptions) (Re
 	pid := strings.TrimSpace(pidRes.Stdout)
 	defer jp.OnJump(ctx, "kill", pid) //nolint:errcheck // best-effort teardown
 
-	tarBasename := path.Base(opts.TarPathOnJump)
-	url := fmt.Sprintf("http://%s/%s", opts.JumpAddr, tarBasename)
 	podCtr := "/host/bin/" + path.Base(opts.CtrPath)
-	curlCmd := fmt.Sprintf(
-		"curl -fsSL %s | %s -a /host/containerd.sock -n k8s.io images import -",
-		url, podCtr)
-
-	for _, pod := range pods {
-		if _, err := kc.Run(ctx, "exec", pod, "-n", opts.Namespace, "--",
-			"sh", "-c", curlCmd); err != nil {
-			return Result{}, fmt.Errorf("http import into %s: %w", pod, err)
+	loaded := make([]string, 0, len(opts.TarPaths))
+	for _, tarPath := range opts.TarPaths {
+		base := path.Base(tarPath)
+		// busybox importer image has wget, not curl (proven live on prod dune-01).
+		url := fmt.Sprintf("http://%s/%s", opts.JumpAddr, base)
+		cmd := fmt.Sprintf(
+			"wget -qO- %s | %s -a /host/containerd.sock -n k8s.io images import -",
+			url, podCtr)
+		for _, pod := range pods {
+			if _, err := kc.Run(ctx, "exec", pod, "-n", opts.Namespace, "--",
+				"sh", "-c", cmd); err != nil {
+				return Result{}, fmt.Errorf("http import %s into %s: %w", base, pod, err)
+			}
 		}
+		loaded = append(loaded, base)
 	}
-	return Result{Pods: pods, Tars: []string{tarBasename}}, nil
+	return Result{Pods: pods, Tars: loaded}, nil
 }
