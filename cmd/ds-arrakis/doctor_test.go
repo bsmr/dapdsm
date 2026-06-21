@@ -59,6 +59,10 @@ func TestDoctorCmd_GreenRunsHostChecks(t *testing.T) {
 			if len(args) >= 2 && args[0] == "auth" {
 				return ssh.Result{Stdout: "yes\n"}, nil
 			}
+			// ControlPlaneTaint query 1: return empty CP node list.
+			if len(args) >= 2 && args[0] == "get" && args[1] == "nodes" {
+				return ssh.Result{Stdout: ""}, nil
+			}
 			return ssh.Result{Stdout: "ok\n"}, nil
 		},
 		jump: func(name string, args ...string) (ssh.Result, error) {
@@ -77,6 +81,59 @@ func TestDoctorCmd_GreenRunsHostChecks(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "user dune exists") {
 		t.Errorf("expected host checks in output, got: %s", out.String())
+	}
+}
+
+func TestDoctorCmd_PrintsClusterSchedulingSection(t *testing.T) {
+	// Multi-node cluster with an untainted CP node; doctor must print the
+	// "cluster scheduling" section and be advisory (no error returned).
+	kubeCalls := 0
+	r := &fakeRunner{
+		kube: func(args ...string) (ssh.Result, error) {
+			kubeCalls++
+			if len(args) >= 2 && args[0] == "auth" {
+				return ssh.Result{Stdout: "yes\n"}, nil
+			}
+			if len(args) >= 2 && args[0] == "get" && args[1] == "nodes" {
+				// Distinguish the two ControlPlaneTaint queries by label selector.
+				joined := strings.Join(args, " ")
+				if strings.Contains(joined, "!node-role") {
+					// Worker query — return one worker.
+					return ssh.Result{Stdout: "worker-00"}, nil
+				}
+				// CP query — one untainted CP node.
+				return ssh.Result{Stdout: "cp-00=;"}, nil
+			}
+			return ssh.Result{Stdout: "ok\n"}, nil
+		},
+		jump: func(name string, args ...string) (ssh.Result, error) {
+			if name == "id" {
+				return ssh.Result{Stdout: "0\n"}, nil
+			}
+			if name == "getent" {
+				return ssh.Result{Stdout: "dune:x:2000:2000::/home/dune:/bin/bash\n"}, nil
+			}
+			return ssh.Result{}, nil
+		},
+	}
+	var out, errOut bytes.Buffer
+	// Even with a failing CP taint check, doctorCmd must return nil (advisory).
+	if err := doctorCmd(context.Background(), fixed(r), []string{"--jump", "j", "--kubeconfig", "/k"}, &out, &errOut); err != nil {
+		t.Fatalf("doctorCmd must not return error for advisory checks, got: %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "cluster scheduling") {
+		t.Errorf("expected '== cluster scheduling ==' section in output, got:\n%s", got)
+	}
+	if !strings.Contains(got, "control-plane workload isolation") {
+		t.Errorf("expected check name in output, got:\n%s", got)
+	}
+	// The check is failing ([!!]) because cp-00 is untainted.
+	if !strings.Contains(got, "[!!]") {
+		t.Errorf("expected [!!] marker for untainted CP node, got:\n%s", got)
+	}
+	if !strings.Contains(got, "cp-00") {
+		t.Errorf("expected untainted node cp-00 named in output, got:\n%s", got)
 	}
 }
 
