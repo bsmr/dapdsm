@@ -5,25 +5,20 @@ import (
 	"testing"
 )
 
-func TestRenderOperators_SubstitutesAndRewrites(t *testing.T) {
-	out, err := renderOperators("v1.5.0", "10.0.0.9:5000")
+func TestRenderOperatorsKeepsOriginalRefs(t *testing.T) {
+	m, err := renderOperators("1.5.0")
 	if err != nil {
 		t.Fatalf("renderOperators: %v", err)
 	}
-	s := string(out)
-	// version + registry substituted into every operator image
+	s := string(m)
 	for _, op := range []string{"battlegroup", "database", "server", "utilities"} {
-		want := "image: 10.0.0.9:5000/funcom/self-hosting/igw-k8s-" + op + "-operator:v1.5.0"
+		want := "image: registry.funcom.com/funcom/self-hosting/igw-k8s-" + op + "-operator:1.5.0"
 		if !strings.Contains(s, want) {
-			t.Errorf("missing rewritten image %q", want)
+			t.Errorf("missing original ref %q", want)
 		}
 	}
-	// no residual upstream registry or version placeholder
-	if strings.Contains(s, "registry.funcom.com") {
-		t.Error("residual registry.funcom.com — ref-rewrite incomplete")
-	}
-	if strings.Contains(s, "__OPERATOR_VERSION__") {
-		t.Error("residual __OPERATOR_VERSION__ placeholder")
+	if strings.Contains(s, "{{") {
+		t.Errorf("unrendered template directive remains:\n%s", s)
 	}
 	// all 4 deployments + SAs + RBAC present
 	for _, op := range []string{"battlegroupoperator", "databaseoperator", "serveroperator", "utilitiesoperator"} {

@@ -16,24 +16,21 @@ import (
 // operatorsCmd handles `ds-arrakis operators bringup …`.
 func operatorsCmd(ctx context.Context, ex clusteraccess.Execer, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 || args[0] != "bringup" {
-		fmt.Fprintln(stderr, "usage: ds-arrakis operators bringup --jump <alias> --kubeconfig <path> --inventory <path> --env <prod|test> --registry <endpoint> [flags]")
+		fmt.Fprintln(stderr, "usage: ds-arrakis operators bringup --jump <alias> --kubeconfig <path> --env <prod|test> [flags]")
 		return ErrUsage
 	}
 	fs := flag.NewFlagSet("operators bringup", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	jump := fs.String("jump", "", "jumphost ssh-config alias (the control host)")
 	kubeconfig := fs.String("kubeconfig", "", "kubeconfig path on the jumphost")
-	inventory := fs.String("inventory", "", "inventory path on the jumphost")
 	env := fs.String("env", "", "target environment: prod|test")
-	registry := fs.String("registry", "", "S2 registry endpoint host:port (image-ref target)")
-	distro := fs.String("distro", "rke2", "cluster distribution")
 	staging := fs.String("staging", "", "depot staging dir on the jumphost (default /home/dune/depot/<env>)")
 	certManagerURL := fs.String("cert-manager-url", "", "cert-manager release URL to apply; empty = skip (assume present)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
-	if *jump == "" || *kubeconfig == "" || *inventory == "" || *env == "" || *registry == "" {
-		fmt.Fprintln(stderr, "operators: --jump, --kubeconfig, --inventory, --env and --registry are required")
+	if *jump == "" || *kubeconfig == "" || *env == "" {
+		fmt.Fprintln(stderr, "operators: --jump, --kubeconfig and --env are required")
 		return ErrUsage
 	}
 	if _, err := bootstrap.AppID(*env); err != nil {
@@ -44,13 +41,10 @@ func operatorsCmd(ctx context.Context, ex clusteraccess.Execer, args []string, s
 		dir = path.Join("/home/dune/depot", *env)
 	}
 
-	d, err := clusteraccess.Load(ctx, ex, clusteraccess.LoadParams{
-		JumpHost: *jump, KubeconfigPath: *kubeconfig, InventoryPath: *inventory, Distro: *distro,
+	access := clusteraccess.New(ex, &clusteraccess.Descriptor{
+		JumpHost:   *jump,
+		Kubeconfig: *kubeconfig,
 	})
-	if err != nil {
-		return err
-	}
-	access := clusteraccess.New(ex, d)
 
 	verPath := path.Join(dir, "images", "operators", "version.txt")
 	verRes, err := access.OnJump(ctx, "cat", verPath)
@@ -62,25 +56,17 @@ func operatorsCmd(ctx context.Context, ex clusteraccess.Execer, args []string, s
 		return fmt.Errorf("empty operator version at %s", verPath)
 	}
 
-	var workers []string
-	for _, n := range access.Nodes(clusteraccess.RoleWorker) {
-		workers = append(workers, n.Name)
-	}
-
 	crdDir := path.Join(dir, "images", "operators", "crds")
 	if _, err := access.OnJump(ctx, "test", "-d", crdDir); err != nil {
 		return fmt.Errorf("operator CRD dir not found on jumphost: %s", crdDir)
 	}
 
 	opts := operatorbringup.Options{
-		Registry:       *registry,
 		Version:        version,
 		CRDDir:         crdDir,
 		CertManagerURL: *certManagerURL,
-		Workers:        workers,
 	}
-	fmt.Fprintf(stdout, "operators: bringing up %s (version %s, registry %s, %d workers)\n",
-		*env, version, *registry, len(workers))
+	fmt.Fprintf(stdout, "operators: bringing up %s (version %s)\n", *env, version)
 	if err := operatorbringup.BringUp(ctx, kubectlAdapter{access}, opts); err != nil {
 		return err
 	}

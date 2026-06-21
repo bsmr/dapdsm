@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -80,6 +81,32 @@ func TestImagesCmd_MissingFlags(t *testing.T) {
 	if err := imagesCmd(context.Background(), ex, nr,
 		[]string{"distribute", "--jump", "j"}, &out, &errOut); err == nil {
 		t.Fatal("expected error when required flags missing")
+	}
+}
+
+func TestImagesLoadUsage(t *testing.T) {
+	var out, errb bytes.Buffer
+	// no args after "images" -> usage listing both subcommands
+	err := imagesCmd(context.Background(), nil, realImagesRunner, []string{}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("want ErrUsage, got %v", err)
+	}
+	if s := errb.String(); !bytes.Contains([]byte(s), []byte("load")) ||
+		!bytes.Contains([]byte(s), []byte("distribute")) {
+		t.Errorf("usage should list load + distribute: %s", s)
+	}
+}
+
+func TestImagesLoadRequiredFlags(t *testing.T) {
+	var out, errb bytes.Buffer
+	// --jump alone is not enough; --kubeconfig, --env are also required; --inventory is NOT required
+	err := loadCmd(context.Background(), nil, []string{"--jump", "jh"}, &out, &errb)
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("want ErrUsage on missing flags, got %v", err)
+	}
+	// inventory must NOT appear in the required-flags error message
+	if msg := errb.String(); strings.Contains(msg, "--inventory") {
+		t.Errorf("--inventory should not be a required flag; got: %s", msg)
 	}
 }
 
