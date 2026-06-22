@@ -69,7 +69,7 @@ func FromData(d clusterconfig.Data) Config {
 
 // Override carries the bring-up CLI flags (empty = unset).
 type Override struct {
-	WorldName, WorldRegion, ServerDisplayName string
+	WorldName, WorldRegion, ServerDisplayName, HostDatacenterID string
 }
 
 // Merge returns base with any non-empty Override field applied (flags win).
@@ -82,6 +82,9 @@ func Merge(base Config, o Override) Config {
 	}
 	if o.ServerDisplayName != "" {
 		base.ServerDisplayName = o.ServerDisplayName
+	}
+	if o.HostDatacenterID != "" {
+		base.HostDatacenterID = o.HostDatacenterID
 	}
 	return base
 }

@@ -183,3 +183,122 @@ func TestPatchBattlegroup_RejectsUnknownFlag(t *testing.T) {
 		t.Errorf("err = %v, want errors.Is(err, ErrUsage)", err)
 	}
 }
+
+const crWithDatacenterID = `{
+  "spec": {
+    "utilities": {
+      "director": {
+        "spec": {
+          "envVars": [
+            {"name": "HOST_DATACENTER_IP_ADDRESS", "value": "127.0.0.1"},
+            {"name": "HOST_DATACENTER_ID", "value": "dune-testing"}
+          ]
+        }
+      }
+    }
+  }
+}`
+
+// idInPatches reports whether any recorded json patch payload contains want.
+func idInPatches(calls []recordedPatch, want string) bool {
+	for _, c := range calls {
+		if strings.Contains(c.payload, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestPatchBattlegroup_IDFromClusterConfig(t *testing.T) {
+	t.Parallel()
+	r := &fakeRunner{cr: []byte(crWithDatacenterID), nodeIP: "192.0.2.151"}
+	deps := patchBgDeps{
+		runner:     r,
+		resolver:   fakeResolver{err: errors.New("unused")},
+		dcIDLoader: func(context.Context) (string, error) { return "bg.example.test", nil },
+		lookupHost: func(string) ([]string, error) { return []string{"192.0.2.151"}, nil },
+	}
+	var out, errOut bytes.Buffer
+	if err := patchBattlegroup(context.Background(), nil, &out, &errOut, deps); err != nil {
+		t.Fatalf("patchBattlegroup: %v", err)
+	}
+	if !idInPatches(r.patchCalls, "bg.example.test") {
+		t.Fatalf("clusterconfig id not patched; payloads: %v", r.patchCalls)
+	}
+}
+
+func TestPatchBattlegroup_FlagIDBeatsClusterConfig(t *testing.T) {
+	t.Parallel()
+	r := &fakeRunner{cr: []byte(crWithDatacenterID), nodeIP: "192.0.2.151"}
+	deps := patchBgDeps{
+		runner:     r,
+		resolver:   fakeResolver{ip: "192.0.2.151"},
+		dcIDLoader: func(context.Context) (string, error) { return "loader.example.test", nil },
+		lookupHost: func(string) ([]string, error) { return []string{"192.0.2.151"}, nil },
+	}
+	var out, errOut bytes.Buffer
+	if err := patchBattlegroup(context.Background(), []string{"--id", "flag.example.test"}, &out, &errOut, deps); err != nil {
+		t.Fatalf("patchBattlegroup: %v", err)
+	}
+	if !idInPatches(r.patchCalls, "flag.example.test") {
+		t.Fatalf("flag id did not win; payloads: %v", r.patchCalls)
+	}
+	if idInPatches(r.patchCalls, "loader.example.test") {
+		t.Fatalf("loader id leaked despite --id flag")
+	}
+}
+
+func TestPatchBattlegroup_FQDNWarnsOnMismatch(t *testing.T) {
+	t.Parallel()
+	r := &fakeRunner{cr: []byte(crWithDatacenterID), nodeIP: "192.0.2.151"}
+	deps := patchBgDeps{
+		runner:     r,
+		resolver:   fakeResolver{ip: "192.0.2.151"},
+		dcIDLoader: func(context.Context) (string, error) { return "bg.example.test", nil },
+		lookupHost: func(string) ([]string, error) { return []string{"203.0.113.9"}, nil }, // != node IP
+	}
+	var out, errOut bytes.Buffer
+	if err := patchBattlegroup(context.Background(), nil, &out, &errOut, deps); err != nil {
+		t.Fatalf("patchBattlegroup: %v", err)
+	}
+	if !strings.Contains(errOut.String(), "WARN") || !strings.Contains(errOut.String(), "bg.example.test") {
+		t.Fatalf("expected mismatch WARN, stderr=%q", errOut.String())
+	}
+}
+
+func TestPatchBattlegroup_FQDNNoWarnOnMatch(t *testing.T) {
+	t.Parallel()
+	r := &fakeRunner{cr: []byte(crWithDatacenterID), nodeIP: "192.0.2.151"}
+	deps := patchBgDeps{
+		runner:     r,
+		resolver:   fakeResolver{ip: "192.0.2.151"},
+		dcIDLoader: func(context.Context) (string, error) { return "bg.example.test", nil },
+		lookupHost: func(string) ([]string, error) { return []string{"192.0.2.151"}, nil },
+	}
+	var out, errOut bytes.Buffer
+	if err := patchBattlegroup(context.Background(), nil, &out, &errOut, deps); err != nil {
+		t.Fatalf("patchBattlegroup: %v", err)
+	}
+	if strings.Contains(errOut.String(), "WARN") {
+		t.Fatalf("unexpected WARN on match: %q", errOut.String())
+	}
+}
+
+func TestPatchBattlegroup_ShortLabelSkipsLookup(t *testing.T) {
+	t.Parallel()
+	r := &fakeRunner{cr: []byte(crWithDatacenterID), nodeIP: "192.0.2.151"}
+	called := false
+	deps := patchBgDeps{
+		runner:     r,
+		resolver:   fakeResolver{ip: "192.0.2.151"},
+		dcIDLoader: func(context.Context) (string, error) { return "dune-testing", nil }, // no dot
+		lookupHost: func(string) ([]string, error) { called = true; return nil, nil },
+	}
+	var out, errOut bytes.Buffer
+	if err := patchBattlegroup(context.Background(), nil, &out, &errOut, deps); err != nil {
+		t.Fatalf("patchBattlegroup: %v", err)
+	}
+	if called {
+		t.Fatal("lookupHost called for a non-FQDN id")
+	}
+}

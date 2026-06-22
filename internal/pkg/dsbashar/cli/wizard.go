@@ -98,6 +98,9 @@ func diffKeys(flags config.Override, found config.Config) []string {
 	if flags.ServerDisplayName != "" && flags.ServerDisplayName != found.ServerDisplayName {
 		out = append(out, fmt.Sprintf("ServerDisplayName: flag=%q cluster=%q", flags.ServerDisplayName, found.ServerDisplayName))
 	}
+	if flags.HostDatacenterID != "" && flags.HostDatacenterID != found.HostDatacenterID {
+		out = append(out, fmt.Sprintf("HostDatacenterID: flag=%q cluster=%q", flags.HostDatacenterID, found.HostDatacenterID))
+	}
 	return out
 }
 
