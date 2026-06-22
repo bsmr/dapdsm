@@ -122,6 +122,7 @@ func bringupCmd(ctx context.Context, args []string, stdin io.Reader, stdout, std
 	fls := fs.String("fls-token", "", "path to the FLS token file on the workstation")
 	noInput := fs.Bool("no-input", false, "never prompt; fail instead of running the wizard")
 	jumpAddr := fs.String("jump-addr", "", "pod-reachable jumphost host:port for image fetch (e.g. 192.168.13.5:8080)")
+	datacenterID := fs.String("datacenter-id", "", "HOST_DATACENTER_ID FQDN (A-record → public IP) for the server-browser ping; empty leaves the Funcom default")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("bringup: %w: %w", ErrUsage, err)
 	}
@@ -129,7 +130,7 @@ func bringupCmd(ctx context.Context, args []string, stdin io.Reader, stdout, std
 		return fmt.Errorf("bringup requires --jump (multi-node only): %w", ErrUsage)
 	}
 	in := resolveInput{
-		Flags:        config.Override{WorldName: *name, WorldRegion: *region, ServerDisplayName: *display},
+		Flags:        config.Override{WorldName: *name, WorldRegion: *region, ServerDisplayName: *display, HostDatacenterID: *datacenterID},
 		FLSTokenFlag: *fls,
 		BGNameFlag:   *name,
 		NoInput:      *noInput,

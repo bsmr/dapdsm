@@ -75,3 +75,17 @@ func TestPromptValue_EmptyKeepsDefault(t *testing.T) {
 		t.Fatalf("empty input should keep default %q, got %q", "Arrakis", got)
 	}
 }
+
+func TestDiffKeys_ReportsHostDatacenterID(t *testing.T) {
+	flags := config.Override{HostDatacenterID: "bg.example.test"}
+	found := config.Config{HostDatacenterID: "dune-testing"}
+	got := diffKeys(flags, found)
+	joined := strings.Join(got, "\n")
+	if !strings.Contains(joined, "HostDatacenterID") {
+		t.Fatalf("diffKeys did not report HostDatacenterID conflict: %v", got)
+	}
+	// matching value → no conflict
+	if d := diffKeys(config.Override{HostDatacenterID: "dune-testing"}, found); len(d) != 0 {
+		t.Fatalf("matching value reported a conflict: %v", d)
+	}
+}
