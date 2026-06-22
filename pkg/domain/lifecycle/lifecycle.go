@@ -1,5 +1,10 @@
 // Package lifecycle runs BG lifecycle verbs (start/stop/restart/update)
 // against a host by shelling out to the Funcom vendor wrapper over SSH.
+//
+// Deprecated for multi-node: this is the single-node (on-VM) path. The
+// K8s-native lifecycle (CR patches that work through a jumphost) lives in
+// pkg/domain/battlegroup (Stop/Start/Restart/Update) and
+// pkg/domain/bgorchestrator (Upgrade). New multi-node code should use those.
 package lifecycle
 
 import "fmt"

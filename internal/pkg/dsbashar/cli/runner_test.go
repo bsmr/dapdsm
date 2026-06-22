@@ -28,8 +28,10 @@ func TestNewKubeRunner_DefaultsToLocalCmdRunner(t *testing.T) {
 }
 
 func TestConfigureRunner_JumpSelectsKubeaccess(t *testing.T) {
+	prevAccess := resolvedAccess
 	t.Cleanup(func() {
 		kubeRunnerFor = func(stderr io.Writer) kube.Runner { return &kube.CmdRunner{Stderr: stderr} }
+		resolvedAccess = prevAccess
 	})
 	configureRunner(stubExecer{}, "jh", "/home/dune/kubeconfig")
 	if _, ok := newKubeRunner(io.Discard).(*kube.CmdRunner); ok {
@@ -38,6 +40,12 @@ func TestConfigureRunner_JumpSelectsKubeaccess(t *testing.T) {
 }
 
 func TestRun_ParsesLeadingGlobalsThenDispatches(t *testing.T) {
+	prevAccess := resolvedAccess
+	prevRunner := kubeRunnerFor
+	t.Cleanup(func() {
+		resolvedAccess = prevAccess
+		kubeRunnerFor = prevRunner
+	})
 	var out bytes.Buffer
 	// `version` needs no cluster; assert global flags are consumed before dispatch.
 	err := Run(context.Background(), []string{"--jump", "jh", "--kubeconfig", "/k", "version"},
