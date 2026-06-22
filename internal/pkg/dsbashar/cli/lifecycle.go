@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+
+	"go.muehmer.eu/dapdsm/pkg/domain/battlegroup"
+	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 )
 
 // DefaultBattlegroupBin is the location of the Funcom-vendor wrapper
@@ -53,7 +56,9 @@ func restartCmd(ctx context.Context, args []string, stdout, stderr io.Writer) er
 func runLifecycle(ctx context.Context, action string, args []string, stdout, stderr io.Writer, deps lifecycleDeps) error {
 	fs := flag.NewFlagSet(action, flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	bin := fs.String("bg-binary", DefaultBattlegroupBin, "Path to Funcom's battlegroup wrapper")
+	bin := fs.String("bg-binary", DefaultBattlegroupBin, "Path to Funcom's battlegroup wrapper (single-node fallback)")
+	ns := fs.String("namespace", "", "BattleGroup namespace (K8s-native path; default: first funcom-seabass-*)")
+	bg := fs.String("bg-name", "", "BattleGroup name (K8s-native path; default: derived from --namespace)")
 	announce := fs.Duration("announce", 0, "Announce a shutdown countdown of this duration, then act (e.g. 5m)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -70,7 +75,39 @@ func runLifecycle(ctx context.Context, action string, args []string, stdout, std
 		fmt.Fprintf(stderr, "%s: --announce is not supported for %s\n", action, action)
 		return ErrUsage
 	}
+
+	// Multi-node (--jump set): K8s-native CR patch. Single-node: vendor wrapper.
+	if resolvedAccess != nil {
+		return withAnnounce(ctx, *announce, kind, func(ctx context.Context) error {
+			return lifecycleKube(ctx, action, *ns, *bg, stderr)
+		}, deps.announceDeps)
+	}
 	return withAnnounce(ctx, *announce, kind, func(ctx context.Context) error {
 		return deps.runVendor(ctx, *bin, action, stdout, stderr)
 	}, deps.announceDeps)
+}
+
+// lifecycleKube resolves the BG and runs the matching battlegroup primitive.
+func lifecycleKube(ctx context.Context, action, ns, bg string, stderr io.Writer) error {
+	r := newKubeRunner(stderr)
+	if ns == "" {
+		found, err := kube.FindBattleGroupNamespace(ctx, r)
+		if err != nil {
+			return err
+		}
+		ns = found
+	}
+	if bg == "" {
+		bg = kube.BattleGroupName(ns)
+	}
+	switch action {
+	case "start":
+		return battlegroup.Start(ctx, r, ns, bg)
+	case "stop":
+		return battlegroup.Stop(ctx, r, ns, bg)
+	case "restart":
+		return battlegroup.Restart(ctx, r, ns, bg)
+	default:
+		return fmt.Errorf("lifecycleKube: unsupported action %q", action)
+	}
 }

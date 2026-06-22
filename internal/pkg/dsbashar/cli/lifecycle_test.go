@@ -8,7 +8,50 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.muehmer.eu/dapdsm/pkg/transport/clusteraccess"
+	"go.muehmer.eu/dapdsm/pkg/transport/kube"
 )
+
+// fakeKubeRunner is a package-level test double for kube.Runner.
+// It captures the last Patch call and serves a placeholder-free, ready CR from Get.
+// Reused by lifecycle tests (Task 4) and upgrade tests (Task 5).
+type fakeKubeRunner struct {
+	// ns is the namespace served by FindBattleGroupNamespace (via Get ns …).
+	ns string
+	// lastPatchType is the patchType argument of the most recent Patch call.
+	lastPatchType string
+	// stopTrue is set when the most recent Patch body contains "stop":true.
+	stopTrue bool
+}
+
+func (f *fakeKubeRunner) Get(_ context.Context, args ...string) ([]byte, error) {
+	// Serve a minimal namespace list so FindBattleGroupNamespace returns f.ns.
+	for _, a := range args {
+		if a == "ns" || a == "--no-headers" {
+			return []byte(f.ns + "\n"), nil
+		}
+	}
+	// Serve a placeholder-free, ready BattleGroup CR.
+	return []byte(`{"status":{"servers":[{"partitionMap":"m","ready":true}]}}`), nil
+}
+
+func (f *fakeKubeRunner) Patch(_ context.Context, _, _, _, patchType, body string) error {
+	f.lastPatchType = patchType
+	f.stopTrue = strings.Contains(body, `"stop":true`)
+	return nil
+}
+
+func (f *fakeKubeRunner) DeletePods(_ context.Context, _ string, _ ...string) error { return nil }
+func (f *fakeKubeRunner) Exec(_ context.Context, _, _ string, _ ...string) ([]byte, error) {
+	return nil, nil
+}
+func (f *fakeKubeRunner) ExecPiped(_ context.Context, _, _ string, _ []byte, _ ...string) ([]byte, error) {
+	return nil, nil
+}
+
+// compile-time check: fakeKubeRunner must satisfy kube.Runner.
+var _ kube.Runner = (*fakeKubeRunner)(nil)
 
 type recordedVendorCall struct {
 	bin, action string
@@ -142,4 +185,24 @@ func TestLifecycle_AnnounceFlag(t *testing.T) {
 			t.Errorf("err = %v, want ErrUsage", err)
 		}
 	})
+}
+
+func TestRunLifecycleUsesKubeWhenJumpSet(t *testing.T) {
+	// Arrange: pretend --jump was parsed by pointing the package globals at a
+	// fake kube runner and a non-nil access marker.
+	prevRunner := kubeRunnerFor
+	prevAccess := resolvedAccess
+	defer func() { kubeRunnerFor = prevRunner; resolvedAccess = prevAccess }()
+
+	fr := &fakeKubeRunner{ns: "funcom-seabass-x"}
+	kubeRunnerFor = func(io.Writer) kube.Runner { return fr }
+	resolvedAccess = &clusteraccess.Access{} // non-nil = multi-node
+
+	var out, errb bytes.Buffer
+	if err := stopCmd(context.Background(), []string{"--namespace", "funcom-seabass-x", "--bg-name", "x"}, &out, &errb); err != nil {
+		t.Fatalf("stopCmd: %v", err)
+	}
+	if fr.lastPatchType != "merge" || !fr.stopTrue {
+		t.Fatalf("expected merge patch stop=true, got type=%q stopTrue=%v", fr.lastPatchType, fr.stopTrue)
+	}
 }

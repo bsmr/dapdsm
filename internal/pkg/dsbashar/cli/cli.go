@@ -74,6 +74,8 @@ func Run(ctx context.Context, args []string, ex clusteraccess.Execer, stdin io.R
 		return applyUserSettingsCmd(ctx, args[1:], stdout, stderr)
 	case "update":
 		return updateCmd(ctx, args[1:], stdout, stderr)
+	case "upgrade":
+		return upgradeCmd(ctx, args[1:], stdout, stderr)
 	case "broadcast":
 		return broadcastCmd(ctx, args[1:], stdout, stderr)
 	case "discover":
@@ -188,6 +190,9 @@ Commands:
                       the apply. This is the post-update hook that
                       prevents Sietches from losing their DisplayName
                       after a 'battlegroup update'.
+  upgrade             Status-gated stop→update→start cycle (multi-node;
+                      requires --jump). Flags: --image-tag (required),
+                      --namespace --bg-name --poll --timeout.
   broadcast [--ssh A]  Send an in-game banner. Default: local kubectl on the
    <text>              node; --ssh <alias> publishes over SSH. --title, --duration.
   discover            List BattleGroups discovered on the cluster.
