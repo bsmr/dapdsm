@@ -24,6 +24,9 @@ func TestParseStatus_FullStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseStatus err = %v", err)
 	}
+	if st.Phase != "Running" {
+		t.Errorf("Phase = %q, want Running", st.Phase)
+	}
 	if st.ServerGroupPhase != "Running" {
 		t.Errorf("ServerGroupPhase = %q, want Running", st.ServerGroupPhase)
 	}

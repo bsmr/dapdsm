@@ -11,6 +11,7 @@ import (
 // the CR's .status subresource. It is JSON-tagged so it serializes into
 // the dunemgr status cache unchanged.
 type Status struct {
+	Phase            string         `json:"phase"`
 	ServerGroupPhase string         `json:"server_group_phase"`
 	DBPhase          string         `json:"db_phase"`
 	DirectorPhase    string         `json:"director_phase"`
@@ -65,6 +66,7 @@ func ParseStatus(cr []byte) (Status, error) {
 	}
 	s := doc.Status
 	out := Status{
+		Phase:            s.Phase,
 		ServerGroupPhase: s.ServerGroupPhase,
 		DBPhase:          s.Database.Phase,
 		DirectorPhase:    s.Utilities.Director.Phase,

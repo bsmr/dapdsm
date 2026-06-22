@@ -54,6 +54,8 @@ func Run(ctx context.Context, args []string, ex clusteraccess.Execer, stdin io.R
 		return applyPlayerIPCmd(ctx, args[1:], stdout, stderr)
 	case "env":
 		return envCmd(ctx, args[1:], stdout, stderr)
+	case "status":
+		return statusCmd(ctx, args[1:], stdout, stderr)
 	case "list-sets":
 		return listSetsCmd(ctx, args[1:], stdout, stderr)
 	case "enable-set":
@@ -152,6 +154,9 @@ Commands:
                       picks up the new value. Use --help for flags.
   env                 Print the parsed /etc/dune/dunectl.env (target,
                       FLS token path, derived Steam app id, extra SANs).
+  status              Show the BattleGroup's observed status: overall /
+                      serverGroup / db / director phases and the per-map
+                      server table. --json for machine-readable output.
   list-sets           Show every map in the BattleGroup with scaling
                       mode, replicas, and partition assignment.
                       --json for machine-readable output.
