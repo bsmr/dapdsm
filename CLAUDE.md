@@ -2,10 +2,9 @@
 
 ## Language & Communication
 
-- **Responses to the user**: Always in German — short, concise, technically precise.
+- **Responses to the user**: Always in English — concise, technically precise.
 - **Everything else** (code, commits, code comments, file contents): Always in English.
-- **Prompt correction**: Check the user's German prompt for style, grammar, and spelling before answering. If errors are found: prepend brief corrections, then the actual answer.
-- **Style (all languages)**: Precise, concise, technical. No filler text, no platitudes.
+- **Style**: Precise, concise, technical. No filler text, no platitudes.
 
 ## Project Overview
 
