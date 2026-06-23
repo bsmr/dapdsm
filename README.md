@@ -129,6 +129,46 @@ ds-bashar reconcile --jump dune@<jumphost> --kubeconfig ~/kubeconfig
 | `ds-thumper` | Config wizard and workstation→VM secret rollout |
 | `dunemgr` | Player-domain TUI: player management, grants, statistics |
 
+Tool names are references from Frank Herbert's Dune universe:
+_Arrakis_ (the desert planet — the foundation layer),
+_Bashar_ (a military rank — operations command),
+_Thumper_ (the device that summons sandworms — deploys things).
+`dunemgr` is a functional name.
+
+### Tool workflow
+
+The tools form a sequential pipeline from first setup to ongoing operations.
+
+```
+  +----------------------------------------------------------+
+  |  1. Config bootstrap  (once per operator workstation)    |
+  |                                                          |
+  |  ds-thumper --> seal + ship config, FLS token, secrets   |
+  +-----------------------------+----------------------------+
+                                |
+  +-----------------------------+----------------------------+
+  |  2. Cluster bootstrap  (once per cluster)                |
+  |                                                          |
+  |  ds-arrakis doctor      --> verify host prerequisites    |
+  |  ds-arrakis images load --> push Funcom images to nodes  |
+  |  ds-arrakis storage     --> install StorageClass         |
+  +-----------------------------+----------------------------+
+                                |
+  +-----------------------------+----------------------------+
+  |  3. BattleGroup bring-up  (once per BattleGroup)        |
+  |                                                          |
+  |  ds-bashar bringup      --> create CRs + world setup     |
+  +-----------------------------+----------------------------+
+                                |
+  +-----------------------------+----------------------------+
+  |  4. Day-2 operations  (ongoing)                          |
+  |                                                          |
+  |  ds-bashar reconcile    --> keep BattleGroup in sync     |
+  |  ds-bashar start / stop / restart / upgrade              |
+  |  dunemgr                --> player management TUI        |
+  +----------------------------------------------------------+
+```
+
 ## License
 
 MIT — Copyright (c) 2026 Boris Mühmer.
