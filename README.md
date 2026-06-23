@@ -129,9 +129,9 @@ ds-bashar reconcile --jump dune@<jumphost> --kubeconfig ~/kubeconfig
 | `ds-thumper` | Config wizard and workstation→VM secret rollout |
 | `dunemgr` | Player-domain TUI: player management, grants, statistics |
 
-Tool names are references from Frank Herbert's Dune universe:
-_Arrakis_ (the desert planet — the foundation layer),
-_Bashar_ (a military rank — operations command),
+Tool names carry Dune-flavoured meaning:
+_ARRAKIS_ (Automated Rancher Runtime And Kubernetes Init System — cluster bootstrap),
+_Bashar_ (a military rank in the Dune universe — operations command),
 _Thumper_ (the device that summons sandworms — deploys things).
 `dunemgr` is a functional name.
 

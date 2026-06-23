@@ -13,12 +13,17 @@ import (
 // subcommand. main maps this to exit code 2.
 var ErrUsage = errors.New("usage")
 
+const (
+	usageRoot = "usage: ds-arrakis <subcommand> [flags]"
+	usageSubs = "subcommands: host, deploy, cluster, doctor, prepare-host, depot, images, operators, storage"
+)
+
 // Run routes args[0] to the appropriate subcommand handler.
 // Unknown or missing subcommands return ErrUsage.
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: ds-arrakis <subcommand> [flags]")
-		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster, doctor, prepare-host, depot, images, operators, storage")
+		fmt.Fprintln(stderr, usageRoot)
+		fmt.Fprintln(stderr, usageSubs)
 		return ErrUsage
 	}
 	switch args[0] {
@@ -46,8 +51,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return storageCmd(ctx, ssh.NewClient(), args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "ds-arrakis: unknown subcommand %q\n", args[0])
-		fmt.Fprintln(stderr, "usage: ds-arrakis <subcommand> [flags]")
-		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster, doctor, prepare-host, depot, images, operators, storage")
+		fmt.Fprintln(stderr, usageRoot)
+		fmt.Fprintln(stderr, usageSubs)
 		return ErrUsage
 	}
 }

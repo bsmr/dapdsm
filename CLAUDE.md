@@ -58,8 +58,11 @@ reachable from the same version's branch here.
 │   └── version/          # Shared version info.
 ├── internal/
 │   └── pkg/              # Tool-bound packages that remain private:
+│       ├── dsarrakis/    #   dsarrakis/{cli}
 │       ├── dsbashar/     #   dsbashar/{cli,config}
+│       ├── dsthumper/    #   dsthumper/{cli}
 │       └── dunemgr/      #   dunemgr/{cli,core,command,tui,ui,sse,server,admin,schedule,config}
+├── scripts/              # Repo-level checks (check-cmd-layout.sh)
 ├── etc/                  # Operator config templates (synced to /opt/dapdsm/etc on the host, served as /etc/dune/ samples)
 │   └── dune/
 ├── bin/                  # Build output (gitignored)
