@@ -7,6 +7,14 @@ on a private cluster.
 
 > **Early-stage software.** Used in production on the RKE2 Testing Station
 > server. Expect rough edges and breaking changes between minor versions.
+>
+> **No warranty.** The architecture, node counts, sizing figures, and configuration
+> shown in this document reflect one operator's live deployment on specific cloud
+> hardware. They are provided for illustration only and carry no performance,
+> stability, or compatibility guarantee. You are solely responsible for your
+> infrastructure design, sizing, and configuration. The author accepts no liability
+> for any damage, data loss, or costs arising from the use of this software or
+> the information in this document.
 
 ## What this is
 
@@ -16,15 +24,58 @@ image distribution, world creation, lifecycle, and config — on top of a
 cluster you already have. It does not provision VMs, nodes, load balancers,
 or the cluster itself.
 
+## Reference topology
+
+The diagram below reflects the author's live RKE2 setup. Your deployment
+will differ; it is a sketch, not a prescription.
+
+```
+    Internet / game clients
+    UDP 7777-7810   TCP 31982   TCP 11717 (director)
+            |
+            v
+    +---------------------+
+    |  Gateway / Firewall |   provider-managed; NAT + DNAT
+    +----------+----------+
+               |
+               |  private cluster network
+               v
+    +----------+----------+
+    |  Load balancers x3  |   HAProxy + nft  (Keepalived VIP)
+    +----+------------+---+
+         |            |
+         v            v
+    +----------+  +-------------------+
+    | Control  |  |  Workers x3       |
+    | plane x3 |->|  game pods        |
+    | (RKE2)   |  |  (hostNetwork)    |
+    +----------+  +-------------------+
+
+  Management (SSH only — via Nebula mesh overlay network):
+
+  Workstation --[Nebula]--> Jumphost --[ProxyJump]--> all nodes
+                                  kubectl / dapdsm run here
+```
+
+> Game clients reach the cluster through the provider's gateway only.
+> No management port is exposed to the internet. All operator access is
+> SSH tunnelled through the Nebula mesh; no node is reachable from the
+> public internet directly.
+
 ## Prerequisites
 
 ### Cluster baseline (assumed, not provided by dapdsm)
 
-| Component | Minimum spec per role |
+> **Speculative sizing.** The figures below are taken from one live deployment and have
+> not been validated against any Funcom guideline or load benchmark. Actual requirements
+> depend on player count, number of active maps, and your cloud provider's hardware
+> characteristics. Treat them as a rough starting point, not a recommendation.
+
+| Component | Spec used in the reference deployment |
 |---|---|
 | Control plane nodes (×3 for HA) | 4 vCPU, 8 GB RAM, 50 GB disk |
 | Worker nodes (×3) | 8 vCPU, 32 GB RAM, 200 GB disk |
-| Load balancer nodes (×2) | 2 vCPU, 2 GB RAM, 20 GB disk |
+| Load balancer nodes (×3) | 2 vCPU, 2 GB RAM, 20 GB disk |
 
 ### Extra components
 
