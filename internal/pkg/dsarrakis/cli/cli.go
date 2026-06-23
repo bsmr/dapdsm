@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -13,9 +13,9 @@ import (
 // subcommand. main maps this to exit code 2.
 var ErrUsage = errors.New("usage")
 
-// dispatch routes args[0] to the appropriate subcommand handler.
+// Run routes args[0] to the appropriate subcommand handler.
 // Unknown or missing subcommands return ErrUsage.
-func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: ds-arrakis <subcommand> [flags]")
 		fmt.Fprintln(stderr, "subcommands: host, deploy, cluster, doctor, prepare-host, depot, images, operators, storage")

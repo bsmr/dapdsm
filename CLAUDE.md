@@ -87,6 +87,9 @@ repo.
 - Test: `go test ./...`
 - Vet/lint: `go vet ./...`
 - Format: `gofmt -w .` (or `goimports -w .` if available).
+- **Layout check** (mandatory before every commit): `./scripts/check-cmd-layout.sh`
+  Fails if any `cmd/<tool>/` directory contains files other than `main.go`.
+  Move all logic to `internal/pkg/<tool>/cli/` — this is not negotiable.
 
 From the meta-repo root, the same commands work with `-C projects/dapdsm`:
 
@@ -116,9 +119,12 @@ func run() error {
 
 - `main()` only calls `run()` and handles `os.Exit` — never call `os.Exit` from `run()`.
 - `run()` is **wiring only**: creates context, signal handling, delegates to `pkg/` or `internal/pkg/`.
-- SDK logic lives in `pkg/transport/` and `pkg/domain/`; tool-bound logic stays in `internal/pkg/<name>/`; all I/O is injected (`context.Context`, `args []string`, `stdin io.Reader`, `stdout io.Writer`, `stderr io.Writer`).
+- SDK logic lives in `pkg/transport/` and `pkg/domain/`; tool-bound logic stays in `internal/pkg/<name>/cli/`; all I/O is injected (`context.Context`, `args []string`, `stdin io.Reader`, `stdout io.Writer`, `stderr io.Writer`).
 - Every package has a `_test.go` with meaningful coverage. Write tests first, then implement.
 - Build output always to `bin/`; `bin/` is gitignored.
+- **`cmd/<tool>/` MUST contain only `main.go`.** No exceptions. Any subcommand handler,
+  helper function, or type that is not literally `main()` and `run()` belongs in
+  `internal/pkg/<tool>/cli/`. Verified by `./scripts/check-cmd-layout.sh`.
 
 ## Access Model
 
