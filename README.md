@@ -5,7 +5,7 @@ _Dune: Awakening_ private dedicated server management suite for
 workflows around Funcom's pre-built game server operators running
 on a private cluster.
 
-> **Early-stage software.** Used in production on the ADESTIS RKE2 Lab
+> **Early-stage software.** Used in production on the RKE2 Testing Station
 > server. Expect rough edges and breaking changes between minor versions.
 
 ## What this is
