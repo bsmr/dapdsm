@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 
 func TestDispatchUnknownVerb(t *testing.T) {
 	var out, errOut bytes.Buffer
-	err := dispatch(context.Background(), []string{"frobnicate"}, strings.NewReader(""), &out, &errOut)
+	err := Run(context.Background(), []string{"frobnicate"}, strings.NewReader(""), &out, &errOut)
 	if !errors.Is(err, ErrUsage) {
 		t.Fatalf("want ErrUsage, got %v", err)
 	}
@@ -18,7 +18,7 @@ func TestDispatchUnknownVerb(t *testing.T) {
 
 func TestDispatchHelp(t *testing.T) {
 	var out, errOut bytes.Buffer
-	if err := dispatch(context.Background(), []string{"help"}, strings.NewReader(""), &out, &errOut); err != nil {
+	if err := Run(context.Background(), []string{"help"}, strings.NewReader(""), &out, &errOut); err != nil {
 		t.Fatalf("help: %v", err)
 	}
 	if !strings.Contains(out.String(), "ds-thumper") {
@@ -28,7 +28,7 @@ func TestDispatchHelp(t *testing.T) {
 
 func TestInitRequiresHost(t *testing.T) {
 	var out, errOut bytes.Buffer
-	err := dispatch(context.Background(), []string{"init"}, strings.NewReader(""), &out, &errOut)
+	err := Run(context.Background(), []string{"init"}, strings.NewReader(""), &out, &errOut)
 	if !errors.Is(err, ErrUsage) {
 		t.Fatalf("want ErrUsage for missing host, got %v", err)
 	}
