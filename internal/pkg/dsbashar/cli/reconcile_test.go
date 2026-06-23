@@ -48,7 +48,7 @@ func TestReconcile_BestEffortIniSet(t *testing.T) {
 	}
 	base := func(bestEffort bool) reconcileDeps {
 		return reconcileDeps{
-			cfg:              config.Config{Target: config.TargetProd, ServerDisplayName: "Ad Astra"},
+			cfg:              config.Config{Target: config.TargetProd, ServerDisplayName: "example-server-display"},
 			initDB:           func(context.Context, io.Writer, io.Writer) error { return nil },
 			patchBg:          func(context.Context, io.Writer, io.Writer) error { return nil },
 			patchPorts:       func(context.Context, int, int, io.Writer, io.Writer) error { return nil },
