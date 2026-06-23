@@ -11,11 +11,13 @@ import (
 	"go.muehmer.eu/dapdsm/pkg/domain/gamedb"
 )
 
+const usageDB = "usage: dunemgr db <host> <exec <sql> | columns <schema> <table> | slow [limit]>"
+
 // dbCmd runs a DB query (exec|columns|slow) against the BattleGroup database
 // on the named host via SSH + kubectl exec into the database pod.
 func dbCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.Writer) error {
 	if len(args) < 2 {
-		fmt.Fprintln(stderr, "usage: dunemgr db <host> exec <sql>")
+		fmt.Fprintln(stderr, usageDB)
 		return fmt.Errorf("db: usage: %w", ErrUsage)
 	}
 	host, sub, rest := args[0], args[1], args[2:]
@@ -23,7 +25,7 @@ func dbCmd(ctx context.Context, c *core.Core, args []string, stdout, stderr io.W
 	switch sub {
 	case "exec":
 		if len(rest) < 1 {
-			fmt.Fprintln(stderr, "usage: dunemgr db <host> exec <sql>")
+			fmt.Fprintln(stderr, usageDB)
 			return fmt.Errorf("db exec: usage: %w", ErrUsage)
 		}
 		sql := strings.Join(rest, " ")

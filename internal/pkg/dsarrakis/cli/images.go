@@ -55,21 +55,20 @@ func realImagesRunner(jump string) skopeo.Runner {
 	return jumpRunner{ex: ssh.NewClient(), host: jump}
 }
 
+const usageImages = "usage: ds-arrakis images <distribute|load> [flags]"
+
 // imagesCmd dispatches `ds-arrakis images <distribute|load> …` to the
 // appropriate subcommand handler.
 func imagesCmd(ctx context.Context, ex clusteraccess.Execer, newRunner func(jump string) skopeo.Runner, args []string, stdout, stderr io.Writer) error {
-	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: ds-arrakis images <distribute|load> [flags]")
+	if len(args) == 0 || (args[0] != "distribute" && args[0] != "load") {
+		fmt.Fprintln(stderr, usageImages)
 		return ErrUsage
 	}
 	switch args[0] {
 	case "distribute":
 		return distributeCmd(ctx, ex, newRunner, args, stdout, stderr)
-	case "load":
-		return loadCmd(ctx, ex, args[1:], stdout, stderr)
 	default:
-		fmt.Fprintln(stderr, "usage: ds-arrakis images <distribute|load> [flags]")
-		return ErrUsage
+		return loadCmd(ctx, ex, args[1:], stdout, stderr)
 	}
 }
 
